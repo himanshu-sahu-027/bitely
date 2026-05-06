@@ -1,0 +1,379 @@
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 9998;
+  background: white;
+  box-shadow: 0 0.4vh 1vh rgba(0, 0, 0, 0.10);
+}
+
+.navbar-container {
+  max-width: 99vw;
+  margin: auto;
+  padding: 0 1.5vw;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.navbar-logo {
+  height: clamp(2.5rem, 3.5vw, 3.5rem);
+  cursor: pointer;
+}
+
+/* ---------------- NAV LINKS ---------------- */
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.2rem, 1.1vw, 1.35rem);
+  font-size: clamp(0.82rem, 1vw, 1.02rem);
+}
+
+/* navigation item */
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  gap: clamp(0.2rem, 0.6vw, 0.5rem);
+  padding: clamp(0.38rem, 0.78vw, 0.58rem)
+           clamp(0.72rem, 1.35vw, 1.02rem);
+
+  margin-right: 0.2vw;
+
+  border-radius: 999rem;
+  color: #2e2f30;
+  font-weight: 500;
+  font-size: clamp(0.98rem, 1.18vw, 1.28rem);
+  opacity: 0.9;
+
+  transition: all 0.25s ease;
+}
+
+/* hover only when not active */
+
+.nav-item:not(.nav-active):hover {
+  background: rgb(233, 234, 238);
+  box-shadow: 0 0.2rem 0.5rem rgba(153, 155, 244, 0.45);
+  transform: translateY(-0.05rem);
+  opacity: 1;
+}
+
+/* icon inherits text color */
+
+.nav-icon {
+  stroke: currentColor;
+  width: clamp(1.1rem, 1.4vw, 1.4rem);
+  height: clamp(1.1rem, 1.4vw, 1.4rem);
+}
+
+/* ---------------- ACTIVE STATE ---------------- */
+
+.nav-active {
+  font-weight: 600;
+
+  background: linear-gradient(
+    to right,
+    #08a0ba,
+    #2e73e1,
+    #453ec8
+  );
+
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* icon color when active */
+
+.nav-active .nav-icon {
+  stroke: #453ec8;
+}
+
+
+/* animated underline */
+
+.nav-underline {
+  position: absolute;
+
+  bottom: clamp(-0.35rem, -0.6vh, -0.25rem);
+  left: 0;
+
+  width: 100%;
+  height: clamp(0.22rem, 0.35vh, 0.30rem);
+
+  border-radius: 10rem;
+
+  background: linear-gradient(
+    to right,
+    #06b6d4,
+    #3b82f6,
+    #4f46e5
+  );
+
+  transform: scaleX(0);
+  transform-origin: center;
+
+  transition: transform 0.45s ease;
+}
+
+.nav-active .nav-underline {
+  transform: scaleX(1);
+}
+/* ---------------- Log in BUTTON ---------------- */
+
+.login-btn {
+  margin-right: 0.3vw;
+
+  padding: clamp(0.38rem, 0.8vw, 0.58rem)
+           clamp(0.92rem, 1.6vw, 1.32rem);
+
+  border-radius: 999rem;
+
+  background: linear-gradient(
+    to right,
+    #06b6d4,
+    #3b82f6,
+    #4f46e5
+  );
+
+  color: white;
+
+  font-size: clamp(0.8rem, 0.98vw, 0.98rem);
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  opacity: 0.9;
+  transition: opacity 0.2s ease;
+}
+
+.login-btn:hover {
+  opacity: 1;
+}
+
+
+/* ---------------- PROFILE ---------------- */
+
+.profile-btn {
+  background: linear-gradient(
+    to bottom,
+    #06b6d4,
+    #3b82f6,
+    #4f46e5
+  );
+
+  color: white;
+
+  padding: clamp(0.55rem, 0.9vw, 0.75rem);
+
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: opacity 0.2s ease;
+}
+
+.profile-btn:hover {
+  opacity: 0.9;
+}
+/* ---------------- SEARCH BAR ---------------- */
+
+
+.navbar-search {
+  display: flex;
+  align-items: center;
+  background: #e9eaed;
+
+  padding: clamp(0.35rem, 0.7vw, 0.5rem)
+           clamp(0.8rem, 1.5vw, 1.2rem);
+
+  border-radius: 999rem;
+
+  width: clamp(10rem, 28vw, 40rem);  
+  margin-left: clamp(0.4rem, 1vw, 1rem); /* space after logo */
+
+  flex-shrink: 1;   /* allow shrinking */
+
+  transition: all 0.2s ease;
+}
+
+.navbar-search:hover {
+  background: #e6e8eb;
+}
+
+.navbar-search:focus-within {
+  background: #e1e5ec;
+  transform: scale(1.02);
+}
+
+/* search icon */
+
+.search-icon {
+  color: #6b7280;
+  margin-right: 0.35rem;
+}
+
+/* input field */
+
+.search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+
+  width: 100%;
+
+  font-size: clamp(0.75rem, 0.9vw, 0.9rem);
+}
+
+
+
+
+/* ---------------- CART BADGE ---------------- */
+
+.cart-icon-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* badge */
+
+.cart-badge {
+  position: absolute;
+
+  top: clamp(-0.55rem, -0.6vh, -0.4rem);
+  right: clamp(-0.55rem, -0.7vw, -0.4rem);
+
+  width: clamp(0.95rem, 1.2vw, 1.1rem);
+  height: clamp(0.95rem, 1.2vw, 1.1rem);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: clamp(0.6rem, 0.7vw, 0.7rem);
+  font-weight: 600;
+
+  background: #4721f3;
+  color: white !important;
+
+  border-radius: 50%;
+}
+
+/* ---------------- LOGO ---------------- */
+
+.logo-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-size: clamp(1rem, 2vw, 3rem);
+  font-weight: 700;
+
+  background: linear-gradient(
+    to right,
+    #08a0ba,
+    #2e73e1,
+    #453ec8
+  );
+
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (max-width: 768px) {
+
+  .navbar-container {
+    padding: 0 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .navbar-search {
+    min-width: 0;
+    width: clamp(7.5rem, 24vw, 11rem);
+    padding: 0.35rem 0.7rem;
+    margin-left: 0.25rem;
+  }
+
+  .navbar-links {
+    gap: 0.35rem;
+  }
+
+  .nav-item {
+    padding: 0.35rem 0.55rem;
+    font-size: 0.85rem;
+  }
+
+  .login-btn {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.78rem;
+  }
+
+  .profile-btn {
+    padding: 0.55rem;
+  }
+}
+
+@media (max-width: 560px) {
+
+  .navbar-search {
+    width: 7rem;
+    padding: 0.32rem 0.6rem;
+  }
+
+  .search-input {
+    font-size: 0.72rem;
+  }
+
+  .navbar-links {
+    gap: 0.25rem;
+  }
+
+  .nav-item {
+    padding: 0.32rem 0.45rem;
+    font-size: 0.78rem;
+    gap: 0.25rem;
+  }
+
+  .nav-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .login-btn {
+    padding: 0.32rem 0.65rem;
+    font-size: 0.74rem;
+  }
+
+  .profile-btn {
+    padding: 0.5rem;
+  }
+}
+
+/* hide signup button on medium screens */
+
+@media (max-width: 1100px) {
+
+  .signup-btn {
+    display: none;
+  }
+
+}
+
+/* hide brand text on smaller screens */
+
+@media (max-width: 900px) {
+
+  .logo-text {
+    display: none;
+  }
+
+}

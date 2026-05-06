@@ -1,0 +1,71 @@
+.kitchen-card-bike {
+  animation: kitchen-card-bike-race 0.9s ease-in-out infinite;
+}
+
+.kitchen-card-clock {
+  position: relative;
+  display: inline-flex;
+  height: 16px;
+  width: 16px;
+  align-items: center;
+  justify-content: center;
+}
+
+.kitchen-card-clock-face {
+  height: 14px;
+  width: 14px;
+  border: 1.5px solid #111827;
+  border-radius: 9999px;
+}
+
+.kitchen-card-clock-hand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 9999px;
+  background-color: #111827;
+  transform-origin: center bottom;
+}
+
+.kitchen-card-clock-hand-hour {
+  height: 4px;
+  width: 1.5px;
+  transform: translate(-50%, -100%) rotate(310deg);
+}
+
+.kitchen-card-clock-hand-minute {
+  height: 5.5px;
+  width: 1.5px;
+  transform: translate(-50%, -100%) rotate(35deg);
+}
+
+.kitchen-card-clock-hand-rotating {
+  animation: kitchen-card-clock-hand-spin 3s linear infinite;
+}
+
+.kitchen-card-address {
+  letter-spacing: 0.01em;
+}
+
+.kitchen-card-delivery {
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.1), rgba(59, 130, 246, 0));
+}
+
+@keyframes kitchen-card-bike-race {
+  0%,
+  100% {
+    transform: translateX(0) skewX(0deg);
+  }
+  50% {
+    transform: translateX(8px) skewX(-10deg);
+  }
+}
+
+@keyframes kitchen-card-clock-hand-spin {
+  0% {
+    transform: translate(-50%, -100%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -100%) rotate(360deg);
+  }
+}

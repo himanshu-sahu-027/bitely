@@ -1,0 +1,66 @@
+.floating-input {
+  position: relative;
+  width: 100%;
+}
+
+.floating-input input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  font-size: 14px;
+  background: white;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.floating-input label {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: white;
+  padding: 0 6px;
+  color: #6b7280;
+  font-size: 14px;
+  pointer-events: none;
+  transition: 0.2s ease;
+}
+
+/* When input focused */
+
+.floating-input input:focus + label {
+  top: -3px;
+  font-size: 12px;
+  color: #2563eb;
+}
+
+/* When input has value */
+
+.floating-input input:not(:placeholder-shown) + label {
+  top: -3px;
+  font-size: 12px;
+  color: #2563eb;
+}
+
+/* Border color */
+
+.floating-input input:focus {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(white, white) padding-box,
+    linear-gradient(to right, #06b6d4, #3b82f6, #4f46e5) border-box;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
+}
+
+.auth-phone-input {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-phone-input:focus-within {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(white, white) padding-box,
+    linear-gradient(to right, #06b6d4, #3b82f6, #4f46e5) border-box;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
+}

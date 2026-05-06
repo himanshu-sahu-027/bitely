@@ -1,0 +1,88 @@
+.about-motive-container{
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:60px 10%;
+min-height:80vh;
+gap:60px;
+flex-wrap:wrap;
+}
+
+/* TEXT SECTION */
+.about-motive-text{
+flex:1;
+max-width:800px;
+text-align:left;
+}
+
+/* wider screens */
+@media (min-width:1400px){
+.about-motive-text{
+max-width:750px;
+}
+}
+
+.about-motive-text p{
+margin-bottom:16px;
+line-height:1.7;
+color:#555;
+font-size:16px;
+}
+
+/* MASCOT SECTION */
+.about-mascot{
+flex:1;
+display:flex;
+justify-content:center;
+align-items:center;
+}
+
+.about-mascot img{
+width:320px;
+max-width:100%;
+}
+
+/* TABLET */
+@media (max-width:1024px){
+
+.about-motive-container{
+padding:60px 8%;
+gap:40px;
+}
+
+.about-motive-text h1{
+font-size:36px;
+}
+
+.about-mascot img{
+width:280px;
+}
+
+}
+
+/* MOBILE */
+@media (max-width:768px){
+
+.about-motive-container{
+flex-direction:column;
+text-align:center;
+padding:50px 6%;
+}
+
+.about-motive-text{
+max-width:100%;
+}
+
+.about-mascot{
+margin-top:30px;
+}
+
+.about-mascot img{
+width:240px;
+}
+
+.about-motive-text h1{
+font-size:30px;
+}
+
+}
