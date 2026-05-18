@@ -1,6 +1,16 @@
 export const errorHandler = (err, req, res, next) => {
   console.error(err);
 
+  if (err.name === "ValidationError") {
+    return res.status(400).json({
+      success: false,
+      message: Object.values(err.errors)
+        .map((item) => item.message)
+        .join(", "),
+      data: null,
+    });
+  }
+
   let statusCode = err.statusCode || err.status || 500;
   const message = err.message || "Server Error";
 
@@ -24,6 +34,12 @@ export const errorHandler = (err, req, res, next) => {
       message === "Invalid type" ||
       message === "Invalid phone number" ||
       message === "Invalid email" ||
+      message === "Invalid latitude" ||
+      message === "Invalid longitude" ||
+      message === "Address is required" ||
+      message === "City is required" ||
+      message === "State is required" ||
+      message === "Pincode is required" ||
       message === "Invalid OTP" ||
       message === "Coupon code is required" ||
       message === "Invalid code" ||

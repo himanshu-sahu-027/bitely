@@ -1,16 +1,29 @@
 export default function AddressCard({ address, onEdit, onDelete }) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white shadow-sm p-4 md:p-5">
+    <div className="rounded-[28px] border border-slate-100 bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)] md:p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-semibold">
               {address.label}
             </span>
+            {address.city ? (
+              <span className="inline-flex items-center rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">
+                {address.city}
+              </span>
+            ) : null}
           </div>
           <div className="mt-3 text-sm text-slate-700">
             <p className="text-slate-800 font-semibold">Address</p>
             <p className="mt-1">{address.fullAddress}</p>
+            {address.displayAddress ? (
+              <p className="mt-2 text-xs leading-5 text-slate-500">{address.displayAddress}</p>
+            ) : null}
+            {Number.isFinite(address.latitude) && Number.isFinite(address.longitude) ? (
+              <p className="mt-2 text-xs font-medium text-slate-500">
+                {address.latitude.toFixed(4)}, {address.longitude.toFixed(4)}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -37,4 +50,3 @@ export default function AddressCard({ address, onEdit, onDelete }) {
     </div>
   );
 }
-
