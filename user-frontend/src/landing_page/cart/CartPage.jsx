@@ -1,10 +1,12 @@
 import { useCart } from "../../context/CartContext";
+import { useNavigate } from "react-router-dom";
 import CartItemCard from "./cartComponents/CartItemCard";
 import CartBillSummary from "./cartComponents/CartBillSummary.jsx";
 import CartCheckoutBar from "./cartComponents/CartCheckoutBar.jsx";
 import CartCouponBox from "./cartComponents/CartCouponBox.jsx";
 
 export default function CartPage() {
+  const navigate = useNavigate();
   const { cart, updateQuantity, removeItem, applyCoupon, removeCoupon } = useCart();
   const itemTotal = cart.items.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -23,7 +25,7 @@ const total = itemTotal + DELIVERY_FEE + gst - discount
   const canCheckout = !isCartEmpty;
 
   const handleOrderNow = () => {
-    alert("Checkout action is ready to connect.");
+    navigate("/checkout");
   };
 
   return (

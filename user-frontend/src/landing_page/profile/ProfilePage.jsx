@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import DummyRazorpayGatewayModal from "../../components/payment/DummyRazorpayGatewayModal";
+import PaymentSuccessOverlay from "../../components/payment/PaymentSuccessOverlay";
 import Sidebar from "./profilecomponents/Sidebar";
 import Orders from "./profilecomponents/Orders/Orders";
 import AddressList from "./profilecomponents/Addresses/AddressList";
@@ -14,7 +16,16 @@ import orderItemsData from "../../data/orderItems";
 import orderPricingData from "../../data/orderPricing";
 import orderStatusHistoryData from "../../data/orderStatusHistory";
 import kitchensData from "../../data/kitchens";
+import {
+  getMergedDummyOrderData,
+  saveProfileOrderPayment,
+  subscribeToDummyOrders,
+} from "../../services/dummyOrderStore";
 import { useAuth } from "../../context/AuthContext";
+import {
+  buildDummyRazorpayResponse,
+  dummyVerifyPayment,
+} from "../../services/dummyPaymentService";
 
 export default function ProfilePage({ initialTab = "orders" }) {
   const navigate = useNavigate();
@@ -25,6 +36,14 @@ export default function ProfilePage({ initialTab = "orders" }) {
   const [navbarHeight, setNavbarHeight] = useState(76);
   const [isPanelPinned, setIsPanelPinned] = useState(false);
   const stickyPanelRef = useRef(null);
+  const redirectTimeoutRef = useRef(null);
+  const [dummyOrderData, setDummyOrderData] = useState(() =>
+    getMergedDummyOrderData(),
+  );
+  const [paymentModalOrder, setPaymentModalOrder] = useState(null);
+  const [selectedGatewayOption, setSelectedGatewayOption] = useState("upi");
+  const [isGatewayLoading, setIsGatewayLoading] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
 
   const [profile, setProfile] = useState({
     name: "Aarav Sharma",
@@ -68,14 +87,20 @@ export default function ProfilePage({ initialTab = "orders" }) {
   const ordersByStatus = useMemo(
     () =>
       buildProfileOrders({
-        orders: ordersData,
-        orderItems: orderItemsData,
-        orderPricing: orderPricingData,
-        orderStatusHistory: orderStatusHistoryData,
+        orders: dummyOrderData.orders.length ? dummyOrderData.orders : ordersData,
+        orderItems: dummyOrderData.orderItems.length
+          ? dummyOrderData.orderItems
+          : orderItemsData,
+        orderPricing: dummyOrderData.orderPricing.length
+          ? dummyOrderData.orderPricing
+          : orderPricingData,
+        orderStatusHistory: dummyOrderData.orderStatusHistory.length
+          ? dummyOrderData.orderStatusHistory
+          : orderStatusHistoryData,
         kitchens: kitchensData,
         addresses,
       }),
-    [addresses],
+    [addresses, dummyOrderData],
   );
 
   const subscriptions = useMemo(
@@ -105,12 +130,29 @@ export default function ProfilePage({ initialTab = "orders" }) {
   };
 
   const handlePay = (order) => {
-    alert(`Payment started for order #${order.orderId}: Rs. ${order.totalPayable} (mock).`);
+    setSelectedGatewayOption("upi");
+    setPaymentModalOrder(order);
   };
 
   const handleCancel = (order) => {
     alert(`Cancellation requested for order #${order.orderId} (${order.kitchenName}).`);
   };
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimeoutRef.current) {
+        window.clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    setDummyOrderData(getMergedDummyOrderData());
+
+    return subscribeToDummyOrders(() => {
+      setDummyOrderData(getMergedDummyOrderData());
+    });
+  }, []);
 
   useEffect(() => {
     const updateStickyState = () => {
@@ -143,6 +185,42 @@ export default function ProfilePage({ initialTab = "orders" }) {
       window.removeEventListener("resize", updateStickyState);
     };
   }, []);
+
+  const handleOrderPaymentComplete = async () => {
+    if (!paymentModalOrder) {
+      return;
+    }
+
+    setIsGatewayLoading(true);
+
+    try {
+      const simulatedResponse = buildDummyRazorpayResponse(
+        `order_${paymentModalOrder.id}`,
+      );
+
+      await dummyVerifyPayment({
+        orderId: paymentModalOrder.id,
+        razorpayOrderId: simulatedResponse.razorpay_order_id,
+      });
+
+      saveProfileOrderPayment(
+        paymentModalOrder,
+        selectedGatewayOption.toUpperCase(),
+        "paid",
+      );
+
+      setPaymentModalOrder(null);
+      setShowSuccessOverlay(true);
+
+      redirectTimeoutRef.current = window.setTimeout(() => {
+        setShowSuccessOverlay(false);
+      }, 1800);
+    } catch (error) {
+      alert(error.message || "Payment could not be completed.");
+    } finally {
+      setIsGatewayLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#eef3f7]">
@@ -223,6 +301,23 @@ export default function ProfilePage({ initialTab = "orders" }) {
           }}
         />
       )}
+
+      <DummyRazorpayGatewayModal
+        open={Boolean(paymentModalOrder)}
+        amount={paymentModalOrder?.totalPayable || paymentModalOrder?.totalAmount || 0}
+        selectedOption={selectedGatewayOption}
+        onSelectOption={setSelectedGatewayOption}
+        onClose={() => setPaymentModalOrder(null)}
+        onPay={handleOrderPaymentComplete}
+        loading={isGatewayLoading}
+      />
+
+      <PaymentSuccessOverlay
+        open={showSuccessOverlay}
+        title="Payment Successful"
+        description="Your unpaid order is now marked as paid."
+        redirectLabel="Updating order status"
+      />
     </div>
   );
 }

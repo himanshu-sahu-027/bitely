@@ -1,5 +1,6 @@
 import { clearOTP, generateOTP, storeOTP, verifyOTP } from "../services/otp.service.js";
 import { loginOrSignupUser, logoutUserSession } from "../services/auth.service.js";
+import { config } from "../config/env.js";
 import { deliverOtp } from "../services/deliverOtp.service.js";
 import { validateSendOtp } from "../utils/validateAuth.js";
 import { createHttpError } from "../utils/createHttpError.js";
@@ -15,16 +16,19 @@ export const sendOTP = async (req, res, next) => {
     const otp = generateOTP();
 
     await storeOTP(identifier, type, otp);
-    try {
-      await deliverOtp({ identifier, type, otp });
-    } catch (error) {
-      await clearOTP(identifier, type);
-      throw error;
+
+    if (!config.DEV_MODE) {
+      try {
+        await deliverOtp({ identifier, type, otp });
+      } catch (error) {
+        await clearOTP(identifier, type);
+        throw error;
+      }
     }
 
     sendResponse(res, {
       message: "OTP sent successfully",
-      data: null,
+      data: config.DEV_MODE ? { devOtp: otp } : null,
     });
   } catch (err) {
     next(err);

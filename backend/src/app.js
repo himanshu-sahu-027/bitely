@@ -21,6 +21,7 @@ import userRoutes from "./routes/user.routes.js";
 import kitchenRoutes from "./routes/kitchen.routes.js";
 import orderRoutes from "./routes/order.routes.js";
 import cartRoutes from "./routes/cart.routes.js";
+import paymentRoutes from "./routes/payment.routes.js";
 
 
 
@@ -29,6 +30,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/kitchen", kitchenRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/cart", cartRoutes);
+app.use("/api/payment", paymentRoutes);
 app.use("/",(req, res) => {
   res.send("Bitely API is running...");
 });

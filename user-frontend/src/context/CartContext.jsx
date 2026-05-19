@@ -187,6 +187,19 @@ export function CartProvider({ children }) {
     }));
   };
 
+  const clearCart = () => {
+    setCart({
+      restaurant: null,
+      items: [],
+      coupon: {
+        code: "",
+        discount: 0,
+        applied: false,
+        error: "",
+      },
+    });
+  };
+
   return (
     <CartContext.Provider
       value={{
@@ -197,6 +210,7 @@ export function CartProvider({ children }) {
         removeItem,
         applyCoupon,
         removeCoupon,
+        clearCart,
       }}
     >
       {children}
