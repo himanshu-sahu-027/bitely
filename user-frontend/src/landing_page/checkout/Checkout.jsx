@@ -1,28 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
-import DummyRazorpayGatewayModal from "../../components/payment/DummyRazorpayGatewayModal";
 import PaymentButton from "../../components/payment/PaymentButton";
 import PaymentSuccessOverlay from "../../components/payment/PaymentSuccessOverlay";
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
-import {
-  dummyCustomerProfile,
-  dummyDeliveryAddresses,
-} from "../../data/dummyPaymentData";
 import { useRazorpayCheckout } from "../../hooks/useRazorpayCheckout";
-import {
-  buildDummyRazorpayResponse,
-  dummyCreatePaymentOrder,
-  dummyVerifyPayment,
-} from "../../services/dummyPaymentService";
-import { saveDummyOrder } from "../../services/dummyOrderStore";
-
-const DELIVERY_FEE = 30;
-const GST_RATE = 0.05;
-const USE_DUMMY_PAYMENT =
-  String(import.meta.env.VITE_USE_DUMMY_PAYMENT || "true").toLowerCase() ===
-  "true";
+import { createPaymentOrder, verifyPayment } from "../../services/paymentService";
+import { fetchAddresses } from "../../services/userService";
 
 function formatCurrency(value) {
   return `Rs. ${value}`;
@@ -43,63 +28,45 @@ function StatusBanner({ type, title, description }) {
   );
 }
 
+function normalizeAddress(address) {
+  return {
+    id: address._id || address.id,
+    label: address.label || "Address",
+    addressLine: address.address_line || address.addressLine || "",
+    city: address.city || "",
+    state: address.state || "",
+    pincode: address.pincode || "",
+    latitude: address.latitude ?? null,
+    longitude: address.longitude ?? null,
+    fullAddress:
+      address.fullAddress ||
+      [address.address_line || address.addressLine, address.city, address.state, address.pincode]
+        .filter(Boolean)
+        .join(", "),
+    isDefault: Boolean(address.is_default || address.isDefault),
+  };
+}
+
 export default function Checkout() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { cart, clearCart } = useCart();
+  const location = useLocation();
+  const { user, isAuthenticated } = useAuth();
+  const { cart, clearCart, isCartLoading } = useCart();
   const { openRazorpayCheckout } = useRazorpayCheckout();
   const redirectTimeoutRef = useRef(null);
 
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("ONLINE");
-  const [selectedAddressId, setSelectedAddressId] = useState(
-    dummyDeliveryAddresses[0]?.id || "",
-  );
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showDummyGateway, setShowDummyGateway] = useState(false);
-  const [dummyGatewayOrder, setDummyGatewayOrder] = useState(null);
-  const [selectedGatewayOption, setSelectedGatewayOption] = useState("upi");
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [paymentState, setPaymentState] = useState({
     type: "info",
-    title: "Test mode enabled",
+    title: "Ready to place your order",
     description:
-      "This checkout uses dummy simulation by default. Razorpay popup code is ready for test mode when you connect the backend later.",
+      "Choose a saved address and payment method. Razorpay verification now happens through the backend.",
   });
   const [latestOrder, setLatestOrder] = useState(null);
-
-  const itemTotal = useMemo(
-    () => cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [cart.items],
-  );
-  const gst = Math.round(itemTotal * GST_RATE);
-  const discount = cart.coupon?.applied ? cart.coupon.discount : 0;
-  const totalAmount = itemTotal + DELIVERY_FEE + gst - discount;
-  const packagingFee = 0;
-  const platformFee = 0;
-
-  const selectedAddress = dummyDeliveryAddresses.find(
-    (address) => address.id === selectedAddressId,
-  );
-
-  const isCartEmpty = cart.items.length === 0;
-  const kitchenName = cart.restaurant?.name || "Bitely Kitchen";
-  const kitchenImage = cart.restaurant?.image || "";
-
-  const checkoutPayload = {
-    user: user?._id || user?.id || "dummy-user",
-    items: cart.items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      quantity: item.quantity,
-      price: item.price,
-      image: item.image,
-      kitchenName,
-      kitchenImage,
-    })),
-    totalAmount,
-    paymentMethod: selectedPaymentMethod,
-    deliveryAddress: selectedAddress,
-  };
 
   useEffect(() => {
     return () => {
@@ -109,28 +76,82 @@ export default function Checkout() {
     };
   }, []);
 
-  const persistDummyOrder = (order, paymentStatus, paymentMethod) => {
-    saveDummyOrder({
-      order: {
-        ...order,
-        kitchenName,
-        kitchenImage,
-        placedAt: new Date().toISOString(),
-      },
-      items: checkoutPayload.items,
-      pricing: {
-        itemTotal,
-        packagingFee,
-        platformFee,
-        discount,
-        deliveryFee: DELIVERY_FEE,
-        tax: gst,
-        finalTotal: totalAmount,
-      },
-      paymentMethod,
-      paymentStatus,
-    });
-  };
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadAddresses() {
+      if (!isAuthenticated) {
+        setAddresses([]);
+        setSelectedAddressId("");
+        return;
+      }
+
+      try {
+        const response = await fetchAddresses();
+        const nextAddresses = (response.data ?? []).map(normalizeAddress);
+
+        if (!ignore) {
+          setAddresses(nextAddresses);
+          const defaultAddress =
+            nextAddresses.find((address) => address.isDefault) || nextAddresses[0];
+          setSelectedAddressId(defaultAddress?.id || "");
+        }
+      } catch (error) {
+        if (!ignore) {
+          setPaymentState({
+            type: "error",
+            title: "Could not load addresses",
+            description: error.message,
+          });
+        }
+      }
+    }
+
+    loadAddresses();
+
+    return () => {
+      ignore = true;
+    };
+  }, [isAuthenticated]);
+
+  const pricing = cart.pricing || {};
+  const itemTotal = pricing.itemTotal || 0;
+  const deliveryFee = pricing.deliveryFee || 0;
+  const gst = pricing.gst || 0;
+  const discount = pricing.discount || 0;
+  const totalAmount = pricing.total || 0;
+  const selectedAddress = addresses.find((address) => address.id === selectedAddressId);
+  const isCartEmpty = cart.items.length === 0;
+
+  const checkoutPayload = useMemo(
+    () => ({
+      items: cart.items.map((item) => ({
+        menuId: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        image: item.image,
+        kitchenId: cart.restaurant?.id,
+        kitchenName: cart.restaurant?.name,
+        kitchenImage: cart.restaurant?.image,
+      })),
+      totalAmount,
+      paymentMethod: selectedPaymentMethod,
+      deliveryAddress: selectedAddress
+        ? {
+            addressLine: selectedAddress.addressLine,
+            city: selectedAddress.city,
+            state: selectedAddress.state,
+            pincode: selectedAddress.pincode,
+            latitude: selectedAddress.latitude,
+            longitude: selectedAddress.longitude,
+            label: selectedAddress.label,
+            fullAddress: selectedAddress.fullAddress,
+          }
+        : null,
+    }),
+    [cart.items, cart.restaurant, selectedAddress, selectedPaymentMethod, totalAmount],
+  );
 
   const startOrdersRedirect = (orderId) => {
     setShowSuccessOverlay(true);
@@ -141,100 +162,35 @@ export default function Checkout() {
     }, 2200);
   };
 
-  const handleCodOrder = async () => {
-    const response = await dummyCreatePaymentOrder(checkoutPayload);
-
-    persistDummyOrder(response.data.order, "pending", "COD");
-    setLatestOrder(response.data.order);
-    setPaymentState({
-      type: "success",
-      title: "COD order placed",
-      description:
-        "Your Cash on Delivery order was created successfully in dummy mode.",
-    });
-    clearCart();
-    startOrdersRedirect(response.data.order.id);
-  };
-
-  const handleOnlineVerification = async (order, razorpayResponse) => {
-    const verification = await dummyVerifyPayment({
-      orderId: order.id,
+  const handleVerifiedPayment = async (order, razorpayResponse) => {
+    const verification = await verifyPayment({
+      orderId: order._id || order.id,
       razorpayOrderId: razorpayResponse.razorpay_order_id,
+      razorpayPaymentId: razorpayResponse.razorpay_payment_id,
+      razorpaySignature: razorpayResponse.razorpay_signature,
     });
 
-    setLatestOrder({
-      ...order,
-      paymentMethod: selectedGatewayOption.toUpperCase(),
-      paymentStatus: verification.data.order.paymentStatus,
-      razorpayPaymentId: verification.data.order.razorpayPaymentId,
-    });
-    persistDummyOrder(
-      {
-        ...order,
-        razorpayPaymentId: verification.data.order.razorpayPaymentId,
-      },
-      "paid",
-      selectedGatewayOption.toUpperCase(),
-    );
+    const verifiedOrder = verification.data.order;
+    setLatestOrder(verifiedOrder);
     setPaymentState({
       type: "success",
       title: "Online payment successful",
-      description:
-        `Payment completed with ${selectedGatewayOption.toUpperCase()}. Redirecting to your orders page.`,
+      description: "Razorpay payment was verified on the server and your order is confirmed.",
     });
-    setShowDummyGateway(false);
-    clearCart();
-    startOrdersRedirect(order.id);
-  };
-
-  const handleOnlineOrder = async () => {
-    const response = await dummyCreatePaymentOrder(checkoutPayload);
-    const { order, razorpayOrder, keyId } = response.data;
-
-    if (USE_DUMMY_PAYMENT) {
-      setDummyGatewayOrder({
-        order,
-        razorpayOrder,
-      });
-      setShowDummyGateway(true);
-      setIsLoading(false);
-      return;
-    }
-
-    await openRazorpayCheckout({
-      key: keyId,
-      amount: razorpayOrder.amount,
-      orderId: razorpayOrder.id,
-      customer: {
-        name: user?.name || dummyCustomerProfile.name,
-        email: user?.email || dummyCustomerProfile.email,
-        contact: user?.phone || dummyCustomerProfile.contact,
-      },
-      onSuccess: async (razorpayResponse) => {
-        try {
-          await handleOnlineVerification(order, razorpayResponse);
-        } catch (error) {
-          setPaymentState({
-            type: "error",
-            title: "Verification failed",
-            description: error.message,
-          });
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      onFailure: (error) => {
-        setPaymentState({
-          type: "error",
-          title: "Payment failed",
-          description: error.message,
-        });
-        setIsLoading(false);
-      },
-    });
+    await clearCart();
+    startOrdersRedirect(verifiedOrder._id || verifiedOrder.id);
   };
 
   const handlePlaceOrder = async () => {
+    if (!isAuthenticated) {
+      navigate("/login", {
+        state: {
+          from: location,
+        },
+      });
+      return;
+    }
+
     if (isCartEmpty || !selectedAddress) {
       setPaymentState({
         type: "error",
@@ -247,60 +203,78 @@ export default function Checkout() {
     setIsLoading(true);
     setPaymentState({
       type: "info",
-      title: "Processing payment",
-      description: "Please wait while we prepare your test checkout.",
+      title: "Processing order",
+      description: "Please wait while we create your order.",
     });
 
     try {
+      const response = await createPaymentOrder(checkoutPayload);
+      const order = response.data.order;
+      setLatestOrder(order);
+
       if (selectedPaymentMethod === "COD") {
-        await handleCodOrder();
-      } else {
-        await handleOnlineOrder();
+        setPaymentState({
+          type: "success",
+          title: "COD order placed",
+          description: "Your order was saved successfully and will be paid at delivery time.",
+        });
+        await clearCart();
+        startOrdersRedirect(order._id || order.id);
+        return;
       }
+
+      await openRazorpayCheckout({
+        key: response.data.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: response.data.razorpayOrder.amount,
+        orderId: response.data.razorpayOrder.id,
+        customer: {
+          name: user?.full_name || user?.name || "Bitely Customer",
+          email: user?.email || "",
+          contact: user?.phone || "",
+        },
+        onSuccess: async (razorpayResponse) => {
+          try {
+            await handleVerifiedPayment(order, razorpayResponse);
+          } catch (error) {
+            setPaymentState({
+              type: "error",
+              title: "Verification failed",
+              description: error.message,
+            });
+          } finally {
+            setIsLoading(false);
+          }
+        },
+        onFailure: (error) => {
+          setPaymentState({
+            type: "error",
+            title: "Payment failed",
+            description: error.message,
+          });
+          setIsLoading(false);
+        },
+      });
     } catch (error) {
       setPaymentState({
         type: "error",
         title: "Checkout failed",
         description: error.message || "Something went wrong during checkout.",
       });
-    } finally {
-      if (USE_DUMMY_PAYMENT || selectedPaymentMethod === "COD") {
-        setIsLoading(false);
-      }
-    }
-  };
-
-  const handleDummyGatewayPayment = async () => {
-    if (!dummyGatewayOrder) {
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const simulatedResponse = buildDummyRazorpayResponse(
-        dummyGatewayOrder.razorpayOrder.id,
-      );
-
-      await handleOnlineVerification(dummyGatewayOrder.order, simulatedResponse);
-    } catch (error) {
-      setPaymentState({
-        type: "error",
-        title: "Payment failed",
-        description: error.message || "Dummy payment could not be completed.",
-      });
-    } finally {
       setIsLoading(false);
     }
   };
 
-  if (isCartEmpty && !latestOrder) {
+  if ((isCartEmpty || isCartLoading) && !latestOrder) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-12">
         <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-bold text-slate-900">Your cart is empty</h1>
+          <h1 className="text-2xl font-bold text-slate-900">
+            {isCartLoading ? "Loading your cart" : "Your cart is empty"}
+          </h1>
           <p className="mt-3 text-slate-600">
-            Add a few dishes first, then come back here to test COD and Razorpay checkout.
+            {isCartLoading
+              ? "Please wait while we fetch your latest cart from the backend."
+              : "Add a few dishes first, then come back here to place your order."}
           </p>
           <button
             type="button"
@@ -322,14 +296,24 @@ export default function Checkout() {
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h1 className="text-3xl font-bold text-slate-900">Checkout</h1>
               <p className="mt-2 text-sm text-slate-600">
-                Choose a delivery address and test payment method for Bitely.
+                Choose a delivery address and payment method for your Bitely order.
               </p>
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-xl font-semibold text-slate-900">Delivery address</h2>
+              {!isAuthenticated ? (
+                <p className="mt-4 text-sm text-slate-600">
+                  Please log in to load your saved addresses.
+                </p>
+              ) : null}
+              {isAuthenticated && addresses.length === 0 ? (
+                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  No saved address found yet. Add one from your profile before placing an order.
+                </div>
+              ) : null}
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                {dummyDeliveryAddresses.map((address) => {
+                {addresses.map((address) => {
                   const isActive = address.id === selectedAddressId;
 
                   return (
@@ -345,10 +329,7 @@ export default function Checkout() {
                       ].join(" ")}
                     >
                       <p className="font-semibold text-slate-900">{address.label}</p>
-                      <p className="mt-2 text-sm text-slate-600">{address.fullName}</p>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {address.addressLine}, {address.city}, {address.state} - {address.pincode}
-                      </p>
+                      <p className="mt-2 text-sm text-slate-600">{address.fullAddress}</p>
                     </button>
                   );
                 })}
@@ -366,9 +347,9 @@ export default function Checkout() {
                   },
                   {
                     id: "ONLINE",
-                    title: "Razorpay Test Mode",
+                    title: "Razorpay",
                     description:
-                      "Use Razorpay test checkout flow. Dummy mode is enabled until backend wiring is connected.",
+                      "Open the real Razorpay checkout popup and verify the payment on the backend.",
                   },
                 ].map((method) => {
                   const isActive = selectedPaymentMethod === method.id;
@@ -409,11 +390,11 @@ export default function Checkout() {
 
             {latestOrder ? (
               <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="text-xl font-semibold text-slate-900">Latest test order</h2>
+                <h2 className="text-xl font-semibold text-slate-900">Latest order</h2>
                 <div className="mt-4 space-y-2 text-sm text-slate-700">
-                  <p>Order ID: {latestOrder.id}</p>
-                  <p>Payment method: {latestOrder.paymentMethod}</p>
-                  <p>Payment status: {latestOrder.paymentStatus || "pending"}</p>
+                  <p>Order ID: {latestOrder._id || latestOrder.id}</p>
+                  <p>Payment method: {latestOrder.paymentMethod || latestOrder.payment_method}</p>
+                  <p>Payment status: {latestOrder.paymentStatus || latestOrder.payment_status || "pending"}</p>
                   <p>Razorpay order ID: {latestOrder.razorpayOrderId || "Not required for COD"}</p>
                   <p>Razorpay payment ID: {latestOrder.razorpayPaymentId || "Will appear after payment"}</p>
                 </div>
@@ -445,13 +426,13 @@ export default function Checkout() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Delivery fee</span>
-                  <span>{formatCurrency(DELIVERY_FEE)}</span>
+                  <span>{formatCurrency(deliveryFee)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>GST</span>
                   <span>{formatCurrency(gst)}</span>
                 </div>
-                <div className="flex items-center justify-between text-blue-500">
+                <div className="flex items-center justify-between text-blue-300">
                   <span>Discount</span>
                   <span>- {formatCurrency(discount)}</span>
                 </div>
@@ -464,7 +445,7 @@ export default function Checkout() {
               <div className="mt-6">
                 <PaymentButton
                   loading={isLoading}
-                  disabled={isCartEmpty}
+                  disabled={isCartEmpty || isCartLoading}
                   onClick={handlePlaceOrder}
                 >
                   {selectedPaymentMethod === "COD"
@@ -476,15 +457,7 @@ export default function Checkout() {
           </aside>
         </div>
       </div>
-      <DummyRazorpayGatewayModal
-        open={showDummyGateway}
-        amount={totalAmount}
-        selectedOption={selectedGatewayOption}
-        onSelectOption={setSelectedGatewayOption}
-        onClose={() => setShowDummyGateway(false)}
-        onPay={handleDummyGatewayPayment}
-        loading={isLoading}
-      />
+
       <PaymentSuccessOverlay
         open={showSuccessOverlay}
         title="Payment Successful"

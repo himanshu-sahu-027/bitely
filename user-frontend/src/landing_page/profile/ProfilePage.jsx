@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import DummyRazorpayGatewayModal from "../../components/payment/DummyRazorpayGatewayModal";
-import PaymentSuccessOverlay from "../../components/payment/PaymentSuccessOverlay";
 import Sidebar from "./profilecomponents/Sidebar";
 import Orders from "./profilecomponents/Orders/Orders";
 import AddressList from "./profilecomponents/Addresses/AddressList";
@@ -10,148 +8,122 @@ import SubscriptionPage from "./profilecomponents/Subscription/SubscriptionPage"
 import SettingsPage from "./profilecomponents/Settings/SettingsPage";
 import EditProfileModal from "./profilecomponents/Profile/EditProfileModal";
 import ProfileHeader from "./profilecomponents/Profile/ProfileHeader";
-import buildProfileOrders from "./utils/buildProfileOrders";
-import ordersData from "../../data/orders";
-import orderItemsData from "../../data/orderItems";
-import orderPricingData from "../../data/orderPricing";
-import orderStatusHistoryData from "../../data/orderStatusHistory";
-import kitchensData from "../../data/kitchens";
-import {
-  getMergedDummyOrderData,
-  saveProfileOrderPayment,
-  subscribeToDummyOrders,
-} from "../../services/dummyOrderStore";
 import { useAuth } from "../../context/AuthContext";
+import { useCart } from "../../context/CartContext";
 import {
-  buildDummyRazorpayResponse,
-  dummyVerifyPayment,
-} from "../../services/dummyPaymentService";
+  cancelOrder,
+  fetchActiveOrders,
+  fetchOrderHistory,
+  reorderOrder,
+} from "../../services/orderService";
+import {
+  createAddress,
+  deleteAddress,
+  fetchAddresses,
+  fetchProfile,
+  updateAddress,
+  updateProfile,
+} from "../../services/userService";
+
+function normalizeAddress(address) {
+  return {
+    id: address._id || address.id,
+    label: address.label || "Address",
+    doorFlat: address.doorFlat || "",
+    area: address.area || "",
+    landmark: address.landmark || "",
+    fullAddress:
+      address.fullAddress ||
+      [address.address_line || address.addressLine, address.city, address.state, address.pincode]
+        .filter(Boolean)
+        .join(", "),
+    displayAddress:
+      address.displayAddress ||
+      [address.address_line || address.addressLine, address.city, address.state, address.pincode]
+        .filter(Boolean)
+        .join(", "),
+    addressLine: address.address_line || address.addressLine || "",
+    city: address.city || "",
+    state: address.state || "",
+    pincode: address.pincode || "",
+    latitude: address.latitude ?? null,
+    longitude: address.longitude ?? null,
+    isDefault: Boolean(address.is_default || address.isDefault),
+  };
+}
 
 export default function ProfilePage({ initialTab = "orders" }) {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
+  const { addToCart } = useCart();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   const [navbarHeight, setNavbarHeight] = useState(76);
   const [isPanelPinned, setIsPanelPinned] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
   const stickyPanelRef = useRef(null);
-  const redirectTimeoutRef = useRef(null);
-  const [dummyOrderData, setDummyOrderData] = useState(() =>
-    getMergedDummyOrderData(),
-  );
-  const [paymentModalOrder, setPaymentModalOrder] = useState(null);
-  const [selectedGatewayOption, setSelectedGatewayOption] = useState("upi");
-  const [isGatewayLoading, setIsGatewayLoading] = useState(false);
-  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
 
   const [profile, setProfile] = useState({
-    name: "Aarav Sharma",
-    phone: user?.phone ?? "+91 98765 43210",
-    email: user?.email ?? "aarav.sharma@bitelymail.com",
+    name: user?.full_name || user?.name || "Bitely User",
+    phone: user?.phone || "",
+    email: user?.email || "",
+  });
+  const [addresses, setAddresses] = useState([]);
+  const [ordersByStatus, setOrdersByStatus] = useState({
+    active: [],
+    past: [],
   });
 
-  const [addresses, setAddresses] = useState([
-    {
-      id: "addr-1",
-      label: "Home",
-      doorFlat: "B-1203",
-      area: "Indiranagar 100 Feet Road",
-      landmark: "Near Metro Station",
-      fullAddress: "B-1203, Indiranagar 100 Feet Road, Near Metro Station, 100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru, Karnataka 560038, India",
-      displayAddress: "100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru, Karnataka 560038, India",
-      addressLine: "100 Feet Road, Indiranagar",
-      city: "Bengaluru",
-      state: "Karnataka",
-      pincode: "560038",
-      latitude: 12.9719,
-      longitude: 77.6412,
-    },
-    {
-      id: "addr-2",
-      label: "College",
-      doorFlat: "Hostel Block C",
-      area: "Koramangala Industrial Layout",
-      landmark: "Gate 2",
-      fullAddress: "Hostel Block C, Koramangala Industrial Layout, Gate 2, Koramangala Industrial Layout, Bengaluru, Karnataka 560095, India",
-      displayAddress: "Koramangala Industrial Layout, Bengaluru, Karnataka 560095, India",
-      addressLine: "Koramangala Industrial Layout",
-      city: "Bengaluru",
-      state: "Karnataka",
-      pincode: "560095",
-      latitude: 12.9352,
-      longitude: 77.6245,
-    },
-  ]);
-
-  const ordersByStatus = useMemo(
-    () =>
-      buildProfileOrders({
-        orders: dummyOrderData.orders.length ? dummyOrderData.orders : ordersData,
-        orderItems: dummyOrderData.orderItems.length
-          ? dummyOrderData.orderItems
-          : orderItemsData,
-        orderPricing: dummyOrderData.orderPricing.length
-          ? dummyOrderData.orderPricing
-          : orderPricingData,
-        orderStatusHistory: dummyOrderData.orderStatusHistory.length
-          ? dummyOrderData.orderStatusHistory
-          : orderStatusHistoryData,
-        kitchens: kitchensData,
-        addresses,
-      }),
-    [addresses, dummyOrderData],
-  );
-
-  const subscriptions = useMemo(
-    () => [
-      {
-        id: "sub-1",
-        kitchenName: "Saffron Kitchen",
-        planDetails: "Monthly Plan • 25% off on breakfast",
-        benefits: ["Priority delivery slots", "Weekly menu recommendations", "Exclusive offers"],
-      },
-      {
-        id: "sub-2",
-        kitchenName: "Urban Bowl",
-        planDetails: "Weekly Plan • Flat ₹50 off on bowls",
-        benefits: ["Free add-ons (once/week)", "Early access to new items", "Save for later cuisines"],
-      },
-    ],
-    [],
-  );
-
-  const handleReorder = (order) => {
-    alert(`Reorder started for order #${order.orderId} (${order.kitchenName}).`);
-  };
-
-  const handleHelp = (order) => {
-    alert(`Help requested for order #${order.orderId}.`);
-  };
-
-  const handlePay = (order) => {
-    setSelectedGatewayOption("upi");
-    setPaymentModalOrder(order);
-  };
-
-  const handleCancel = (order) => {
-    alert(`Cancellation requested for order #${order.orderId} (${order.kitchenName}).`);
-  };
+  const subscriptions = [];
 
   useEffect(() => {
-    return () => {
-      if (redirectTimeoutRef.current) {
-        window.clearTimeout(redirectTimeoutRef.current);
+    let ignore = false;
+
+    async function loadProfilePage() {
+      setIsLoading(true);
+      setError("");
+
+      try {
+        const [profileResponse, addressResponse, activeOrdersResponse, historyResponse] =
+          await Promise.all([
+            fetchProfile(),
+            fetchAddresses(),
+            fetchActiveOrders(),
+            fetchOrderHistory(),
+          ]);
+
+        if (ignore) {
+          return;
+        }
+
+        setProfile({
+          name: profileResponse.data?.full_name || "Bitely User",
+          phone: profileResponse.data?.phone || "",
+          email: profileResponse.data?.email || "",
+        });
+        setAddresses((addressResponse.data ?? []).map(normalizeAddress));
+        setOrdersByStatus({
+          active: activeOrdersResponse.data ?? [],
+          past: historyResponse.data ?? [],
+        });
+      } catch (loadError) {
+        if (!ignore) {
+          setError(loadError.message);
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
+        }
       }
+    }
+
+    loadProfilePage();
+
+    return () => {
+      ignore = true;
     };
-  }, []);
-
-  useEffect(() => {
-    setDummyOrderData(getMergedDummyOrderData());
-
-    return subscribeToDummyOrders(() => {
-      setDummyOrderData(getMergedDummyOrderData());
-    });
   }, []);
 
   useEffect(() => {
@@ -186,40 +158,96 @@ export default function ProfilePage({ initialTab = "orders" }) {
     };
   }, []);
 
-  const handleOrderPaymentComplete = async () => {
-    if (!paymentModalOrder) {
-      return;
-    }
-
-    setIsGatewayLoading(true);
-
+  const handleAddressChange = async ({ type, value, id }) => {
     try {
-      const simulatedResponse = buildDummyRazorpayResponse(
-        `order_${paymentModalOrder.id}`,
-      );
+      if (type === "delete") {
+        await deleteAddress(id);
+        setAddresses((current) => current.filter((address) => address.id !== id));
+        return;
+      }
 
-      await dummyVerifyPayment({
-        orderId: paymentModalOrder.id,
-        razorpayOrderId: simulatedResponse.razorpay_order_id,
-      });
+      const payload = {
+        label: value.label,
+        address_line: value.addressLine,
+        city: value.city,
+        state: value.state,
+        pincode: value.pincode,
+        latitude: value.latitude,
+        longitude: value.longitude,
+      };
 
-      saveProfileOrderPayment(
-        paymentModalOrder,
-        selectedGatewayOption.toUpperCase(),
-        "paid",
-      );
+      if (type === "edit") {
+        const response = await updateAddress(value.id, payload);
+        const nextAddress = normalizeAddress(response.data);
+        setAddresses((current) =>
+          current.map((address) => (address.id === nextAddress.id ? nextAddress : address)),
+        );
+        return;
+      }
 
-      setPaymentModalOrder(null);
-      setShowSuccessOverlay(true);
-
-      redirectTimeoutRef.current = window.setTimeout(() => {
-        setShowSuccessOverlay(false);
-      }, 1800);
-    } catch (error) {
-      alert(error.message || "Payment could not be completed.");
-    } finally {
-      setIsGatewayLoading(false);
+      const response = await createAddress(payload);
+      setAddresses((current) => [normalizeAddress(response.data), ...current]);
+    } catch (addressError) {
+      window.alert(addressError.message);
     }
+  };
+
+  const handleReorder = (order) => {
+    reorderOrder(order.orderId)
+      .then(async (response) => {
+        const availableItems = (response.data ?? []).filter((item) => item.available);
+
+        for (const item of availableItems) {
+          for (let count = 0; count < item.quantity; count += 1) {
+            // Authenticated cart writes happen on the backend, so only the menu id is required here.
+            // The server keeps the single-kitchen cart rule intact.
+            await addToCart(null, {
+              id: item.menu_id,
+              name: item.latest_name || item.previous_name,
+              price: item.latest_price || item.previous_price || 0,
+              image: item.latest_image_url || "",
+            });
+          }
+        }
+
+        if (availableItems.length === 0) {
+          window.alert("Those menu items are no longer available for reorder.");
+          return;
+        }
+
+        navigate("/cart");
+      })
+      .catch((reorderError) => {
+        window.alert(reorderError.message);
+      });
+  };
+
+  const handleHelp = (order) => {
+    window.alert(`Help requested for order #${order.orderId}.`);
+  };
+
+  const handlePay = (order) => {
+    window.alert(
+      `Order #${order.orderId} is still unpaid. New checkout payments now use real Razorpay from the checkout page.`,
+    );
+  };
+
+  const handleCancel = (order) => {
+    cancelOrder(order.orderId)
+      .then(async () => {
+        const [activeOrdersResponse, historyResponse] = await Promise.all([
+          fetchActiveOrders(),
+          fetchOrderHistory(),
+        ]);
+
+        setOrdersByStatus({
+          active: activeOrdersResponse.data ?? [],
+          past: historyResponse.data ?? [],
+        });
+      })
+      .catch((cancelError) => {
+        window.alert(cancelError.message);
+      });
   };
 
   return (
@@ -250,7 +278,19 @@ export default function ProfilePage({ initialTab = "orders" }) {
                   isPanelPinned ? "lg:overflow-y-auto" : "lg:overflow-visible",
                 ].join(" ")}
               >
-                {activeTab === "orders" && (
+                {isLoading ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
+                    Loading your profile data...
+                  </div>
+                ) : null}
+
+                {error ? (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">
+                    {error}
+                  </div>
+                ) : null}
+
+                {!isLoading && !error && activeTab === "orders" ? (
                   <Orders
                     activeOrders={ordersByStatus.active}
                     pastOrders={ordersByStatus.past}
@@ -259,65 +299,61 @@ export default function ProfilePage({ initialTab = "orders" }) {
                     onReorder={handleReorder}
                     onHelp={handleHelp}
                   />
-                )}
+                ) : null}
 
-                {activeTab === "subscriptions" && (
+                {!isLoading && !error && activeTab === "subscriptions" ? (
                   <SubscriptionPage subscriptions={subscriptions} />
-                )}
+                ) : null}
 
-                {activeTab === "addresses" && (
+                {!isLoading && !error && activeTab === "addresses" ? (
                   <AddressList
                     addresses={addresses}
-                    onChange={(next) => setAddresses(next)}
+                    onChange={handleAddressChange}
                   />
-                )}
+                ) : null}
 
-                {activeTab === "settings" && (
+                {!isLoading && !error && activeTab === "settings" ? (
                   <SettingsPage
-                    onLogout={() => {
-                      logout();
+                    onLogout={async () => {
+                      await logout();
                       navigate("/", { replace: true });
                     }}
-                    onDeleteAccount={() => {
-                      logout();
+                    onDeleteAccount={async () => {
+                      await logout();
                       navigate("/", { replace: true });
                     }}
                   />
-                )}
+                ) : null}
               </div>
             </main>
           </div>
         </div>
       </div>
 
-      {isEditProfileOpen && (
+      {isEditProfileOpen ? (
         <EditProfileModal
           open={isEditProfileOpen}
           profile={profile}
           onClose={() => setIsEditProfileOpen(false)}
-          onSave={(nextProfile) => {
-            setProfile(nextProfile);
-            setIsEditProfileOpen(false);
+          onSave={async (nextProfile) => {
+            try {
+              const response = await updateProfile({
+                full_name: nextProfile.name,
+                email: nextProfile.email,
+              });
+
+              setProfile({
+                name: response.data?.full_name || nextProfile.name,
+                phone: response.data?.phone || nextProfile.phone,
+                email: response.data?.email || nextProfile.email,
+              });
+              setIsEditProfileOpen(false);
+            } catch (saveError) {
+              window.alert(saveError.message);
+            }
           }}
         />
-      )}
-
-      <DummyRazorpayGatewayModal
-        open={Boolean(paymentModalOrder)}
-        amount={paymentModalOrder?.totalPayable || paymentModalOrder?.totalAmount || 0}
-        selectedOption={selectedGatewayOption}
-        onSelectOption={setSelectedGatewayOption}
-        onClose={() => setPaymentModalOrder(null)}
-        onPay={handleOrderPaymentComplete}
-        loading={isGatewayLoading}
-      />
-
-      <PaymentSuccessOverlay
-        open={showSuccessOverlay}
-        title="Payment Successful"
-        description="Your unpaid order is now marked as paid."
-        redirectLabel="Updating order status"
-      />
+      ) : null}
     </div>
   );
 }

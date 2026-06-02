@@ -1,35 +1,49 @@
-import { useMemo } from "react";
-import { KitchenGrid } from "../../components/kitchen"
-import categories from "../../data/categories";
-import foods from "../../data/foods";
-import kitchens from "../../data/kitchens";
-import menus from "../../data/menus";
-import menuTagMap from "../../data/menuTagMap";
-import menuTags from "../../data/menuTags";
-import {
-  applyKitchenGridFilters,
-  buildKitchenFilterMetadata,
-  defaultKitchenFilters,
-} from "../../utils/filterKitchenGridItems";
+import { useEffect, useState } from "react";
+
+import { KitchenGrid } from "../../components/kitchen";
+import { fetchRestaurants } from "../../services/restaurantService";
+import { defaultKitchenFilters } from "../../utils/filterKitchenGridItems";
 
 function KitchenSection({ filters = defaultKitchenFilters }) {
-  const kitchensWithFilterMetadata = useMemo(
-    () =>
-      buildKitchenFilterMetadata({
-        kitchens,
-        menus,
-        foods,
-        categories,
-        menuTags,
-        menuTagMap,
-      }),
-    [],
-  );
+  const [kitchens, setKitchens] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const visibleKitchens = useMemo(
-    () => applyKitchenGridFilters(kitchensWithFilterMetadata, filters),
-    [filters, kitchensWithFilterMetadata],
-  );
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadKitchens() {
+      setIsLoading(true);
+      setError("");
+
+      try {
+        const response = await fetchRestaurants({
+          sort: filters.sort,
+          minRating: filters.rating || undefined,
+          categories: filters.categories.length > 0 ? filters.categories.join(",") : undefined,
+          tags: filters.tags.length > 0 ? filters.tags.join(",") : undefined,
+        });
+
+        if (!ignore) {
+          setKitchens(response.data ?? []);
+        }
+      } catch (loadError) {
+        if (!ignore) {
+          setError(loadError.message);
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadKitchens();
+
+    return () => {
+      ignore = true;
+    };
+  }, [filters]);
 
   return (
     <div
@@ -39,9 +53,18 @@ function KitchenSection({ filters = defaultKitchenFilters }) {
       <h2 className="text-2xl font-bold px-4 mb-4">
         Popular Kitchens Near You
       </h2>
-      <KitchenGrid kitchens={visibleKitchens}/>
+
+      {isLoading ? (
+        <p className="px-4 text-sm text-slate-600">Loading kitchens...</p>
+      ) : null}
+
+      {error ? (
+        <p className="px-4 text-sm text-red-600">{error}</p>
+      ) : null}
+
+      {!isLoading && !error ? <KitchenGrid kitchens={kitchens} /> : null}
     </div>
-  )
+  );
 }
 
-export default KitchenSection
+export default KitchenSection;

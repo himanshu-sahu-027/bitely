@@ -4,6 +4,11 @@ import {
   getKitchenGridItemsPage,
   getKitchenPageData,
 } from "../services/kitchenService/index.js";
+import {
+  Food,
+  FoodCategory,
+  PopularFood,
+} from "../models/kitchenCatalog/index.js";
 import { createHttpError } from "../utils/createHttpError.js";
 import { parsePagination } from "../utils/pagination.js";
 import { sendResponse } from "../utils/sendResponse.js";
@@ -118,6 +123,80 @@ export const getKitchenById = async (req, res, next) => {
     sendResponse(res, {
       message: "Kitchen details fetched successfully",
       data: kitchenPage,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getFoodCategories = async (req, res, next) => {
+  try {
+    const categories = await FoodCategory.find().sort({ name: 1 }).lean();
+
+    sendResponse(res, {
+      message: "Food categories fetched successfully",
+      data: categories.map((category) => ({
+        id: String(category._id),
+        name: category.name,
+        slug: category.slug,
+        icon: category.icon || "",
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getFoods = async (req, res, next) => {
+  try {
+    const query = {};
+
+    if (req.query.slug) {
+      query.slug = req.query.slug;
+    }
+
+    const foods = await Food.find(query)
+      .populate("category_id")
+      .sort({ name: 1 })
+      .lean();
+
+    sendResponse(res, {
+      message: "Foods fetched successfully",
+      data: foods.map((food) => ({
+        id: String(food._id),
+        name: food.name,
+        slug: food.slug,
+        categoryId: String(food.category_id?._id || food.category_id),
+        categorySlug: food.category_id?.slug || null,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getPopularFoods = async (req, res, next) => {
+  try {
+    const popularFoods = await PopularFood.find()
+      .populate("food_id")
+      .sort({ order: 1 })
+      .lean();
+
+    sendResponse(res, {
+      message: "Popular foods fetched successfully",
+      data: popularFoods
+        .filter((item) => item.food_id)
+        .map((item) => ({
+          id: String(item._id),
+          order: item.order,
+          image: item.imageUrl || "",
+          food: {
+            id: String(item.food_id._id),
+            name: item.food_id.name,
+            slug: item.food_id.slug,
+            categoryId: String(item.food_id.category_id),
+          },
+        })),
     });
   } catch (err) {
     next(err);

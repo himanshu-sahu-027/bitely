@@ -1,11 +1,9 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import FilterButton from "./FilterButton";
 import FilterChips from "./FilterChips";
 import QuickTagFilters from "./QuickTagFilters";
 import FilterModal from "./filterModal/FilterModal";
-
-import categories from "../../data/categories";
 
 const defaultFilters = {
   sort: "popularity",
@@ -20,7 +18,7 @@ const sortLabels = {
   priceHigh: "Cost: High to Low",
 };
 
-function CategoryFilter({ onFilterChange }) {
+function CategoryFilter({ categories = [], onFilterChange }) {
   const [open, setOpen] = useState(false);
   const [filters, setFilters] = useState(defaultFilters);
 
@@ -35,45 +33,36 @@ function CategoryFilter({ onFilterChange }) {
     onFilterChange?.(nextFilters);
   };
 
-  const appliedFilterChips = useMemo(() => {
-    const categoryMap = new Map(
-      categories.map((c) => [c.slug, c.name])
-    );
+  const categoryMap = new Map(categories.map((category) => [category.slug, category.name]));
+  const appliedFilterChips = [];
 
-    const chips = [];
-
-    if (filters.sort !== "popularity") {
-      chips.push({
-        key: "sort",
-        label: sortLabels[filters.sort],
-        onRemove: () =>
-          updateFilters({ ...filters, sort: "popularity" }),
-      });
-    }
-
-    if (filters.rating > 0) {
-      chips.push({
-        key: "rating",
-        label: `Rating ${filters.rating}+`,
-        onRemove: () =>
-          updateFilters({ ...filters, rating: 0 }),
-      });
-    }
-
-    filters.categories.forEach((slug) => {
-      chips.push({
-        key: slug,
-        label: categoryMap.get(slug),
-        onRemove: () =>
-          updateFilters({
-            ...filters,
-            categories: filters.categories.filter((c) => c !== slug),
-          }),
-      });
+  if (filters.sort !== "popularity") {
+    appliedFilterChips.push({
+      key: "sort",
+      label: sortLabels[filters.sort],
+      onRemove: () => updateFilters({ ...filters, sort: "popularity" }),
     });
+  }
 
-    return chips;
-  }, [filters]);
+  if (filters.rating > 0) {
+    appliedFilterChips.push({
+      key: "rating",
+      label: `Rating ${filters.rating}+`,
+      onRemove: () => updateFilters({ ...filters, rating: 0 }),
+    });
+  }
+
+  filters.categories.forEach((slug) => {
+    appliedFilterChips.push({
+      key: slug,
+      label: categoryMap.get(slug),
+      onRemove: () =>
+        updateFilters({
+          ...filters,
+          categories: filters.categories.filter((category) => category !== slug),
+        }),
+    });
+  });
 
   return (
     <>
@@ -95,6 +84,7 @@ function CategoryFilter({ onFilterChange }) {
 
       {open && (
         <FilterModal
+          categories={categories}
           filters={filters}
           applyFilters={updateFilters}
           close={() => setOpen(false)}

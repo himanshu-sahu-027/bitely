@@ -1,29 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import popularFoods from "../../../data/popularFoods";
-import foods from "../../../data/foods";
 import PopularFoodItem from "./PopularFoodsItem";
+import { fetchPopularFoods } from "../../../services/restaurantService";
 
 function PopularFoodsSlider() {
   const sliderRef = useRef(null);
+  const [popularFoodItems, setPopularFoodItems] = useState([]);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-
-  // Merge the popular-food order data with full food details like name and slug.
-  const popularFoodItems = popularFoods
-    .map((popularFood) => {
-      const matchedFood = foods.find((food) => food.id === popularFood.foodId);
-
-      if (!matchedFood) {
-        return null;
-      }
-
-      return {
-        ...matchedFood,
-        ...popularFood,
-      };
-    })
-    .filter(Boolean);
 
   // Keep the arrow buttons in sync with the current scroll position.
   const updateScrollState = () => {
@@ -41,12 +25,42 @@ function PopularFoodsSlider() {
   };
 
   useEffect(() => {
-    updateScrollState();
+    let ignore = false;
+
+    fetchPopularFoods()
+      .then((response) => {
+        if (!ignore) {
+          const items = (response.data ?? []).map((item) => ({
+            id: item.food.id,
+            name: item.food.name,
+            slug: item.food.slug,
+            image: item.image,
+            order: item.order,
+          }));
+          setPopularFoodItems(items);
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setPopularFoodItems([]);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const frameId = requestAnimationFrame(() => {
+      updateScrollState();
+    });
 
     const handleResize = () => updateScrollState();
     window.addEventListener("resize", handleResize);
 
     return () => {
+      cancelAnimationFrame(frameId);
       window.removeEventListener("resize", handleResize);
     };
   }, [popularFoodItems.length]);

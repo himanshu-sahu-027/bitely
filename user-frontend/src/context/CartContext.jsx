@@ -1,209 +1,337 @@
-import { createContext, useContext, useState, useEffect } from "react";
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useEffect, useState } from "react";
 
-// Create Context
+import {
+  addCartItem,
+  applyCartCoupon,
+  clearCartRequest,
+  fetchCart,
+  removeCartCoupon,
+  removeCartItem,
+  updateCartItem,
+} from "../services/cartService";
+import { useAuth } from "./AuthContext";
+
 const CartContext = createContext();
 
-// Provider Component (wraps your app)
+const EMPTY_CART = {
+  id: null,
+  restaurant: null,
+  items: [],
+  coupon: {
+    code: "",
+    discount: 0,
+    applied: false,
+    error: "",
+  },
+  pricing: {
+    itemTotal: 0,
+    deliveryFee: 0,
+    platformFee: 0,
+    gst: 0,
+    discount: 0,
+    total: 0,
+  },
+};
+
+function readGuestCart() {
+  if (typeof window === "undefined") {
+    return EMPTY_CART;
+  }
+
+  try {
+    const saved = window.localStorage.getItem("bitely.cart");
+    return saved ? JSON.parse(saved) : EMPTY_CART;
+  } catch {
+    window.localStorage.removeItem("bitely.cart");
+    return EMPTY_CART;
+  }
+}
+
+function calculateGuestPricing(cart) {
+  const itemTotal = cart.items.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0,
+  );
+  const gst = itemTotal > 0 ? Math.round(itemTotal * 0.05) : 0;
+  const deliveryFee = itemTotal > 0 ? 30 : 0;
+  const discount = cart.coupon?.applied ? cart.coupon.discount : 0;
+
+  return {
+    itemTotal,
+    deliveryFee,
+    platformFee: 0,
+    gst,
+    discount,
+    total: Math.max(itemTotal + deliveryFee + gst - discount, 0),
+  };
+}
+
+function withGuestPricing(cart) {
+  return {
+    ...cart,
+    pricing: calculateGuestPricing(cart),
+  };
+}
+
 export function CartProvider({ children }) {
-  // Cart state
-  const [cart, setCart] = useState(() => {
-    const saved = localStorage.getItem("bitely.cart");
-
-    if (saved) {
-      return JSON.parse(saved);
-    }
-
-    return {
-      restaurant: null,
-      items: [],
-      coupon: {
-        code: "",
-        discount: 0,
-        applied: false,
-        error: "",
-      },
-    };
-  });
+  const { isAuthenticated } = useAuth();
+  const [cart, setCart] = useState(() => withGuestPricing(readGuestCart()));
+  const [isCartLoading, setIsCartLoading] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem("bitely.cart", JSON.stringify(cart));
-  }, [cart]);
+    if (typeof window === "undefined" || isAuthenticated) {
+      return;
+    }
 
-  //  ADD ITEM TO CART
-  const addToCart = (restaurant, item) => {
-    setCart((prev) => {
-      //  If user selects a different restaurant, reset cart
-      if (prev.restaurant && prev.restaurant.id !== restaurant.id) {
+    window.localStorage.setItem("bitely.cart", JSON.stringify(cart));
+  }, [cart, isAuthenticated]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadCart() {
+      if (!isAuthenticated) {
+        setCart(withGuestPricing(readGuestCart()));
+        return;
+      }
+
+      setIsCartLoading(true);
+
+      try {
+        const response = await fetchCart();
+
+        if (!ignore) {
+          setCart(response.data);
+        }
+      } catch {
+        if (!ignore) {
+          setCart(EMPTY_CART);
+        }
+      } finally {
+        if (!ignore) {
+          setIsCartLoading(false);
+        }
+      }
+    }
+
+    loadCart();
+
+    return () => {
+      ignore = true;
+    };
+  }, [isAuthenticated]);
+
+  const updateGuestCart = (updater) => {
+    setCart((previousCart) => withGuestPricing(updater(previousCart)));
+  };
+
+  const syncServerCart = async (request) => {
+    setIsCartLoading(true);
+
+    try {
+      const response = await request();
+      setCart(response.data);
+      return response.data;
+    } finally {
+      setIsCartLoading(false);
+    }
+  };
+
+  const addToCart = async (restaurant, item) => {
+    if (isAuthenticated) {
+      return syncServerCart(() =>
+        addCartItem({
+          menu_id: item.id,
+          quantity: 1,
+        }),
+      );
+    }
+
+    updateGuestCart((previousCart) => {
+      if (
+        previousCart.restaurant &&
+        previousCart.restaurant.id !== restaurant.id
+      ) {
         return {
+          ...EMPTY_CART,
           restaurant,
           items: [{ ...item, quantity: 1 }],
         };
       }
 
-      //  Check if item already exists
-      const existingItem = prev.items.find((i) => i.id === item.id);
+      const existingItem = previousCart.items.find(
+        (currentItem) => currentItem.id === item.id,
+      );
 
-      let updatedItems;
-
-      if (existingItem) {
-        //  Increase quantity
-        updatedItems = prev.items.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i,
-        );
-      } else {
-        //  Add new item
-        updatedItems = [...prev.items, { ...item, quantity: 1 }];
-      }
+      const nextItems = existingItem
+        ? previousCart.items.map((currentItem) =>
+            currentItem.id === item.id
+              ? { ...currentItem, quantity: currentItem.quantity + 1 }
+              : currentItem,
+          )
+        : [...previousCart.items, { ...item, quantity: 1 }];
 
       return {
-        ...prev,
+        ...previousCart,
         restaurant,
-        items: updatedItems,
+        items: nextItems,
       };
     });
   };
 
-  //  UPDATE QUANTITY (+ or -)
-  const updateQuantity = (itemId, change) => {
-    setCart((prev) => {
-      const existing = prev.items.find((item) => item.id === itemId);
+  const updateQuantity = async (itemId, change) => {
+    const existingItem = cart.items.find((item) => item.id === itemId);
 
-      //  If item not found, do nothing
-      if (!existing) return prev;
+    if (!existingItem) {
+      return;
+    }
 
-      let updatedItems;
+    if (isAuthenticated) {
+      const nextQuantity = Math.max(existingItem.quantity + change, 0);
 
-      if (change > 0) {
-        // + Increase quantity
-        updatedItems = prev.items.map((item) =>
-          item.id === itemId ? { ...item, quantity: item.quantity + 1 } : item,
-        );
-      } else {
-        // - Decrease quantity
-        if (existing.quantity === 1) {
-          //  Remove item if quantity becomes 0
-          updatedItems = prev.items.filter((item) => item.id !== itemId);
-        } else {
-          updatedItems = prev.items.map((item) =>
-            item.id === itemId
-              ? { ...item, quantity: item.quantity - 1 }
-              : item,
-          );
-        }
+      return syncServerCart(() =>
+        updateCartItem(itemId, {
+          quantity: nextQuantity,
+        }),
+      );
+    }
+
+    updateGuestCart((previousCart) => {
+      const currentItem = previousCart.items.find((item) => item.id === itemId);
+
+      if (!currentItem) {
+        return previousCart;
       }
 
+      const nextQuantity = currentItem.quantity + change;
+      const nextItems =
+        nextQuantity <= 0
+          ? previousCart.items.filter((item) => item.id !== itemId)
+          : previousCart.items.map((item) =>
+              item.id === itemId ? { ...item, quantity: nextQuantity } : item,
+            );
+
       return {
-        ...prev,
-        restaurant: updatedItems.length > 0 ? prev.restaurant : null,
-        items: updatedItems,
+        ...previousCart,
+        restaurant: nextItems.length > 0 ? previousCart.restaurant : null,
+        items: nextItems,
       };
     });
   };
 
-  //  REMOVE ONE QUANTITY FROM CART
-  const removeFromCart = (itemId) => {
-    updateQuantity(itemId, -1);
-  };
+  const removeFromCart = async (itemId) => updateQuantity(itemId, -1);
 
-  //  REMOVE ITEM COMPLETELY
-  const removeItem = (itemId) => {
-    setCart((prev) => {
-      const updatedItems = prev.items.filter((item) => item.id !== itemId);
+  const removeItem = async (itemId) => {
+    if (isAuthenticated) {
+      return syncServerCart(() => removeCartItem(itemId));
+    }
+
+    updateGuestCart((previousCart) => {
+      const nextItems = previousCart.items.filter((item) => item.id !== itemId);
 
       return {
-        ...prev,
-        restaurant: updatedItems.length > 0 ? prev.restaurant : null,
-        items: updatedItems,
+        ...previousCart,
+        restaurant: nextItems.length > 0 ? previousCart.restaurant : null,
+        items: nextItems,
       };
     });
   };
 
-  // apply coupon
-  const applyCoupon = (code, itemTotal) => {
-    const formatted = code.trim().toUpperCase();
+  const applyCoupon = async (code, itemTotal) => {
+    if (isAuthenticated) {
+      return syncServerCart(() =>
+        applyCartCoupon({
+          code,
+        }),
+      );
+    }
 
+    const formattedCode = code.trim().toUpperCase();
     const rules = {
       BITELY50: { discount: 50, min: 200 },
       SAVE100: { discount: 100, min: 400 },
     };
+    const rule = rules[formattedCode];
 
-    const rule = rules[formatted];
+    updateGuestCart((previousCart) => {
+      if (!formattedCode) {
+        return {
+          ...previousCart,
+          coupon: {
+            code: "",
+            discount: 0,
+            applied: false,
+            error: "Enter a code",
+          },
+        };
+      }
 
-    if (!formatted) {
-      setCart((prev) => ({
-        ...prev,
+      if (!rule) {
+        return {
+          ...previousCart,
+          coupon: {
+            code: formattedCode,
+            discount: 0,
+            applied: false,
+            error: "Invalid code",
+          },
+        };
+      }
+
+      if (itemTotal < rule.min) {
+        return {
+          ...previousCart,
+          coupon: {
+            code: formattedCode,
+            discount: 0,
+            applied: false,
+            error: `Add Rs. ${rule.min} to use this coupon`,
+          },
+        };
+      }
+
+      return {
+        ...previousCart,
         coupon: {
-          code: "",
-          discount: 0,
-          applied: false,
-          error: "Enter a code",
+          code: formattedCode,
+          discount: rule.discount,
+          applied: true,
+          error: "",
         },
-      }));
-      return;
-    }
-
-    if (!rule) {
-      setCart((prev) => ({
-        ...prev,
-        coupon: {
-          code: formatted,
-          discount: 0,
-          applied: false,
-          error: "Invalid code",
-        },
-      }));
-      return;
-    }
-
-    if (itemTotal < rule.min) {
-      setCart((prev) => ({
-        ...prev,
-        coupon: {
-          code: formatted,
-          discount: 0,
-          applied: false,
-          error: `Add ₹${rule.min} to use this coupon`,
-        },
-      }));
-      return;
-    }
-
-    setCart((prev) => ({
-      ...prev,
-      coupon: {
-        code: formatted,
-        discount: rule.discount,
-        applied: true,
-        error: "",
-      },
-    }));
+      };
+    });
   };
 
-  // remove coupon
-  const removeCoupon = () => {
-    setCart((prev) => ({
-      ...prev,
-      coupon: { code: "", discount: 0, applied: false, error: "" },
-    }));
-  };
+  const removeCoupon = async () => {
+    if (isAuthenticated) {
+      return syncServerCart(() => removeCartCoupon());
+    }
 
-  const clearCart = () => {
-    setCart({
-      restaurant: null,
-      items: [],
+    updateGuestCart((previousCart) => ({
+      ...previousCart,
       coupon: {
         code: "",
         discount: 0,
         applied: false,
         error: "",
       },
-    });
+    }));
+  };
+
+  const clearCart = async () => {
+    if (isAuthenticated) {
+      return syncServerCart(() => clearCartRequest());
+    }
+
+    setCart(EMPTY_CART);
   };
 
   return (
     <CartContext.Provider
       value={{
         cart,
+        isCartLoading,
         addToCart,
         removeFromCart,
         updateQuantity,
@@ -218,5 +346,4 @@ export function CartProvider({ children }) {
   );
 }
 
-// Custom hook for easy usage
 export const useCart = () => useContext(CartContext);

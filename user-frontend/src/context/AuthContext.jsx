@@ -1,4 +1,8 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+
+import { setUnauthorizedHandler } from "../api/axios";
+import { getCurrentUser, logoutUser } from "../services/authService";
 
 const AUTH_STORAGE_KEY = "bitely.auth";
 
@@ -25,6 +29,7 @@ function readStoredSession() {
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(readStoredSession);
+  const [isBootstrapping, setIsBootstrapping] = useState(Boolean(readStoredSession()?.token));
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -39,18 +44,79 @@ export function AuthProvider({ children }) {
     window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
   }, [session]);
 
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setSession(null);
+    });
+
+    return () => {
+      setUnauthorizedHandler(null);
+    };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function bootstrapSession() {
+      if (!session?.token) {
+        setIsBootstrapping(false);
+        return;
+      }
+
+      try {
+        const response = await getCurrentUser();
+
+        if (!ignore) {
+          setSession((currentSession) =>
+            currentSession
+              ? {
+                  ...currentSession,
+                  user: response.data,
+                }
+              : currentSession,
+          );
+        }
+      } catch {
+        if (!ignore) {
+          setSession(null);
+        }
+      } finally {
+        if (!ignore) {
+          setIsBootstrapping(false);
+        }
+      }
+    }
+
+    bootstrapSession();
+
+    return () => {
+      ignore = true;
+    };
+  }, [session?.token]);
+
   const value = useMemo(
     () => ({
       session,
       token: session?.token ?? null,
       user: session?.user ?? null,
       isAuthenticated: Boolean(session?.token),
+      isBootstrapping,
       login: (nextSession) => setSession(nextSession),
-      logout: () => setSession(null),
+      logout: async () => {
+        try {
+          if (session?.token) {
+            await logoutUser();
+          }
+        } catch {
+          // Clear stale sessions locally even if the API call fails.
+        } finally {
+          setSession(null);
+        }
+      },
       getAuthorizationHeader: () =>
         session?.token ? { Authorization: `Bearer ${session.token}` } : {},
     }),
-    [session],
+    [isBootstrapping, session],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

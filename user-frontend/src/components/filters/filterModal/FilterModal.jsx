@@ -4,7 +4,7 @@ import SortFilter from "./SortFilter";
 import CategorySelector from "./CategorySelector";
 import RatingFilter from "./RatingFilter";
 
-function FilterModal({ close, applyFilters, filters: initialFilters }) {
+function FilterModal({ categories = [], close, applyFilters, filters: initialFilters }) {
   const [tab, setTab] = useState("sort");
   const [filters, setFilters] = useState(initialFilters);
 
@@ -78,7 +78,11 @@ function FilterModal({ close, applyFilters, filters: initialFilters }) {
             )}
 
             {tab === "categories" && (
-              <CategorySelector filters={filters} setFilters={setFilters} />
+              <CategorySelector
+                categories={categories}
+                filters={filters}
+                setFilters={setFilters}
+              />
             )}
 
             {tab === "rating" && (

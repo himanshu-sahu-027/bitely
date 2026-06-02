@@ -22,18 +22,18 @@ export default function AddressList({ addresses, onChange }) {
     setModalOpen(true);
   };
 
-  const handleDelete = (id) => {
-    onChange?.((sortedAddresses ?? []).filter((a) => a.id !== id));
+  const handleDelete = async (id) => {
+    await onChange?.({
+      type: "delete",
+      id,
+    });
   };
 
-  const handleSubmit = (nextAddress) => {
-    const current = sortedAddresses ?? [];
-    if (modalMode === "edit") {
-      const updated = current.map((a) => (a.id === nextAddress.id ? nextAddress : a));
-      onChange?.(updated);
-    } else {
-      onChange?.([nextAddress, ...current]);
-    }
+  const handleSubmit = async (nextAddress) => {
+    await onChange?.({
+      type: modalMode,
+      value: nextAddress,
+    });
     setModalOpen(false);
   };
 
@@ -77,4 +77,3 @@ export default function AddressList({ addresses, onChange }) {
     </section>
   );
 }
-

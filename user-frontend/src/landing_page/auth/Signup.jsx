@@ -6,6 +6,7 @@ import FloatingInput from "./FloatingInput";
 import GoogleIcon from "./GoogleIcon";
 import AuthDivider from "./AuthDivider";
 import { useAuth } from "../../context/AuthContext";
+import { sendOtp, updateCurrentUser, verifyOtp } from "../../services/authService";
 
 function Signup() {
   const [fullName, setFullName] = useState("");
@@ -13,6 +14,7 @@ function Signup() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [agree, setAgree] = useState(false);
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -24,7 +26,7 @@ function Signup() {
     Boolean(phoneNumber.trim()) &&
     agree;
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     const trimmedFullName = fullName.trim();
@@ -42,17 +44,45 @@ function Signup() {
     }
 
     setError("");
+    setIsSubmitting(true);
 
-    login({
-      token: "mock-jwt-token",
-      user: {
-        name: trimmedFullName,
+    try {
+      const otpResponse = await sendOtp({
+        identifier: trimmedPhoneNumber,
+        type: "phone",
+      });
+      const devOtp = otpResponse.data?.devOtp;
+      const enteredOtp = window.prompt(
+        devOtp
+          ? `Enter the signup OTP for ${trimmedPhoneNumber}. Dev OTP: ${devOtp}`
+          : `Enter the OTP sent to ${trimmedPhoneNumber}`,
+        devOtp || "",
+      );
+
+      if (!enteredOtp) {
+        throw new Error("OTP verification was cancelled.");
+      }
+
+      const verifyResponse = await verifyOtp({
+        identifier: trimmedPhoneNumber,
+        type: "phone",
+        otp: enteredOtp.trim(),
+        full_name: trimmedFullName,
+      });
+
+      login(verifyResponse.data);
+
+      await updateCurrentUser({
+        full_name: trimmedFullName,
         email: trimmedEmail,
-        phone: trimmedPhoneNumber,
-      },
-    });
+      });
 
-    navigate(redirectTo, { replace: true });
+      navigate(redirectTo, { replace: true });
+    } catch (submitError) {
+      setError(submitError.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -124,15 +154,15 @@ function Signup() {
 
         <button
           type="submit"
-          disabled={!isFormValid}
+          disabled={!isFormValid || isSubmitting}
           className={`w-full mt-5 py-3 rounded-lg text-white font-medium transition
         ${
-          isFormValid
+          isFormValid && !isSubmitting
             ? "bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:opacity-90"
             : "bg-gray-300 cursor-not-allowed"
         }`}
         >
-          Create account
+          {isSubmitting ? "Creating account..." : "Create account"}
         </button>
 
         <AuthDivider />

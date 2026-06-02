@@ -1,5 +1,3 @@
-import { SearchBar } from "../../components/search"
-
 function HeroSection() {
   return (
     <div className="bg-gradient-to-r from-cyan-700 via-blue-700 to-indigo-800 text-white pt-5 pb-8">

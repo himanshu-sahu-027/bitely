@@ -11,6 +11,12 @@ export default function SubscriptionPage({ subscriptions }) {
       </div>
 
       <div className="space-y-4 ">
+        {subscriptions.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+            You do not have any active kitchen subscriptions yet.
+          </div>
+        ) : null}
+
         {subscriptions.map((sub) => (
           <div
             key={sub.id}
@@ -26,13 +32,9 @@ export default function SubscriptionPage({ subscriptions }) {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => alert(`Manage plans for ${sub.kitchenName} (mock).`)}
-                className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-800 shadow-sm transition hover:bg-slate-50"
-              >
-                Manage / View Plans
-              </button>
+              <div className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-500 shadow-sm">
+                Active Plan
+              </div>
             </div>
 
             <div className="mt-4">
@@ -52,4 +54,3 @@ export default function SubscriptionPage({ subscriptions }) {
     </section>
   );
 }
-

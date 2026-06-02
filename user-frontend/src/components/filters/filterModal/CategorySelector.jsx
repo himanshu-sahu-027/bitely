@@ -1,6 +1,4 @@
-import categories from "../../../data/categories";
-
-function CategorySelector({ filters, setFilters }) {
+function CategorySelector({ categories = [], filters, setFilters }) {
   const toggleCategory = (slug) => {
     const exists = filters.categories.includes(slug);
 
