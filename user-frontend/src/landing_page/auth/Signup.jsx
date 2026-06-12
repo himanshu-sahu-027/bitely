@@ -5,41 +5,41 @@ import AuthModalWrapper from "./AuthModalWrapper";
 import FloatingInput from "./FloatingInput";
 import GoogleIcon from "./GoogleIcon";
 import AuthDivider from "./AuthDivider";
-import { useAuth } from "../../context/AuthContext";
-import { sendOtp, updateCurrentUser, verifyOtp } from "../../services/authService";
+import { registerUser } from "../../services/authService";
 
 function Signup() {
-  const [fullName, setFullName] = useState("");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [agree, setAgree] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const location = useLocation();
   const navigate = useNavigate();
-  const { login } = useAuth();
 
   const redirectTo = location.state?.from?.pathname ?? "/profile";
+
   const isFormValid =
-    Boolean(fullName.trim()) &&
+    Boolean(name.trim()) &&
     Boolean(email.trim()) &&
-    Boolean(phoneNumber.trim()) &&
-    agree;
+    Boolean(password) &&
+    Boolean(confirmPassword);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const trimmedFullName = fullName.trim();
-    const trimmedEmail = email.trim();
-    const trimmedPhoneNumber = phoneNumber.trim();
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim().toLowerCase();
 
-    if (!trimmedFullName || !trimmedEmail || !trimmedPhoneNumber) {
+    if (!trimmedName || !trimmedEmail || !password || !confirmPassword) {
       setError("Please fill in all fields.");
       return;
     }
 
-    if (!agree) {
-      setError("Please accept the terms to continue.");
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
       return;
     }
 
@@ -47,37 +47,17 @@ function Signup() {
     setIsSubmitting(true);
 
     try {
-      const otpResponse = await sendOtp({
-        identifier: trimmedPhoneNumber,
-        type: "phone",
-      });
-      const devOtp = otpResponse.data?.devOtp;
-      const enteredOtp = window.prompt(
-        devOtp
-          ? `Enter the signup OTP for ${trimmedPhoneNumber}. Dev OTP: ${devOtp}`
-          : `Enter the OTP sent to ${trimmedPhoneNumber}`,
-        devOtp || "",
-      );
-
-      if (!enteredOtp) {
-        throw new Error("OTP verification was cancelled.");
-      }
-
-      const verifyResponse = await verifyOtp({
-        identifier: trimmedPhoneNumber,
-        type: "phone",
-        otp: enteredOtp.trim(),
-        full_name: trimmedFullName,
-      });
-
-      login(verifyResponse.data);
-
-      await updateCurrentUser({
-        full_name: trimmedFullName,
+      await registerUser({
+        name: trimmedName,
         email: trimmedEmail,
+        password,
+        confirmPassword,
       });
 
-      navigate(redirectTo, { replace: true });
+      navigate("/verify-email", {
+        replace: true,
+        state: { email: trimmedEmail, from: { pathname: redirectTo } },
+      });
     } catch (submitError) {
       setError(submitError.message);
     } finally {
@@ -88,12 +68,12 @@ function Signup() {
   return (
     <AuthModalWrapper title="Sign up">
       <form onSubmit={handleSubmit}>
-        <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-3">
           <FloatingInput
-            label="Full Name"
+            label="Name"
             type="text"
-            value={fullName}
-            onChange={(event) => setFullName(event.target.value)}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
           />
 
           <FloatingInput
@@ -104,53 +84,23 @@ function Signup() {
           />
 
           <FloatingInput
-            label="Phone Number"
-            type="tel"
-            value={phoneNumber}
-            onChange={(event) => setPhoneNumber(event.target.value)}
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+
+          <FloatingInput
+            label="Confirm Password"
+            type="password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
           />
         </div>
 
         {error ? (
           <p className="mt-3 text-sm text-red-500">{error}</p>
         ) : null}
-
-        {/* Terms Checkbox */}
-
-        <label className="flex items-start gap-2 mt-4 text-sm text-gray-600 ">
-          <input
-            type="checkbox"
-            checked={agree}
-            onChange={() => setAgree(!agree)}
-            className="mt-1 accent-indigo-600"
-          />
-
-          <span>
-            I agree to Bitely's{" "}
-            <a
-              href="/terms/customer"
-              className="text-sky-600 hover:underline"
-            >
-              Terms of Service
-            </a>
-            ,{" "}
-            <a
-              href="/privacy"
-              className="text-sky-600 hover:underline"
-            >
-              Privacy Policy
-            </a>{" "}
-            and{" "}
-            <a
-              href="/content-policies"
-              className="text-sky-600 hover:underline"
-            >
-              Content Policies
-            </a>
-          </span>
-        </label>
-
-        {/* Create Account Button */}
 
         <button
           type="submit"

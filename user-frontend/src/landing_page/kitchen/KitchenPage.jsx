@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import CategoryMenu from "../../components/category/CategoryMenu";
-import { ChatButton, ChatWindow } from "../../components/chat";
 import { MenuSection } from "../../components/food";
 import { KitchenBanner } from "../../components/kitchen";
 import FloatingCart from "../cart/cartComponents/FloatingCart";

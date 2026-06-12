@@ -4,6 +4,7 @@ import CartItemCard from "./cartComponents/CartItemCard";
 import CartBillSummary from "./cartComponents/CartBillSummary.jsx";
 import CartCheckoutBar from "./cartComponents/CartCheckoutBar.jsx";
 import CartCouponBox from "./cartComponents/CartCouponBox.jsx";
+import EmptyCart from "./cartComponents/EmptyCart.jsx";
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -30,10 +31,11 @@ const total = itemTotal + DELIVERY_FEE + gst - discount
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-24 pt-6 md:px-6">
-      <h1 className="text-2xl font-bold text-slate-900">Cart</h1>
 
       {cart.items.length === 0 ? (
-        <p className="mt-6 text-slate-600">Cart is empty</p>
+        <>
+          <EmptyCart/>
+        </>
       ) : (
         <>
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">

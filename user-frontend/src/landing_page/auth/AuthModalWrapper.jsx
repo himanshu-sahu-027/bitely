@@ -9,12 +9,12 @@ function AuthModalWrapper({ children, title }) {
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-md"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-md mt-10"
       onClick={() => navigate(closeTarget)}
     >
 
       <div
-        className="relative w-[420px] rounded-xl bg-white p-7 shadow-2xl"
+        className="relative w-[420px] rounded-xl bg-white p-7 shadow-2xl mt-5"
         onClick={(e) => e.stopPropagation()}
       >
 

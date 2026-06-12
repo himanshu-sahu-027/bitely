@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import FloatingInput from "./FloatingInput";
 import { useAuth } from "../../context/AuthContext";
-import { loginUser } from "../../services/authService";
+import AuthModalWrapper from "./AuthModalWrapper";
+import { verifyEmail, loginUser } from "../../services/authService";
+import { useEffect } from "react";
 
-function EmailLogin() {
+function VerifyEmailOtp() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -17,34 +19,36 @@ function EmailLogin() {
 
   const redirectTo = location.state?.from?.pathname ?? "/profile";
 
-  const handleSubmit = async () => {
-    const trimmedEmail = email.trim().toLowerCase();
-
-    if (!trimmedEmail || !password) {
-      return;
+  useEffect(() => {
+    if (location.state?.email) {
+      setEmail(location.state.email);
     }
+  }, [location.state?.email]);
+
+  const handleVerify = async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedOtp = otp.trim();
+
+    if (!trimmedEmail || !trimmedOtp) return;
 
     setIsSubmitting(true);
     setError("");
 
     try {
-      const response = await loginUser({
-        email: trimmedEmail,
-        password,
-      });
-
+      // Backend returns token + user
+      const response = await verifyEmail({ email: trimmedEmail, otp: trimmedOtp });
       login(response.data);
+
       navigate(redirectTo, { replace: true });
-    } catch (submitError) {
-      setError(submitError.message);
+    } catch (e) {
+      setError(e?.message || "Failed to verify email.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <>
-    <div className="grid grid-cols-1 gap-3">
+    <AuthModalWrapper title="Verify your email">
       <FloatingInput
         label="Email"
         type="email"
@@ -53,36 +57,24 @@ function EmailLogin() {
       />
 
       <FloatingInput
-        label="Password"
-        type="password"
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
+        label="OTP"
+        type="text"
+        value={otp}
+        onChange={(event) => setOtp(event.target.value)}
       />
-    </div>
-      
-      
 
       <button
         type="button"
-        onClick={handleSubmit}
-        disabled={!email.trim() || !password || isSubmitting}
+        onClick={handleVerify}
+        disabled={!email.trim() || !otp.trim() || isSubmitting}
         className="mt-4 w-full rounded-lg bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 py-3 text-white font-medium disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isSubmitting ? "Logging in..." : "Log in"}
+        {isSubmitting ? "Verifying..." : "Verify OTP"}
       </button>
 
-      <div className="flex justify-end mt-2 mr-1">
-        <Link
-          to="/forgot-password"
-          className="text-xs font-medium text-sky-600 "
-        >
-          Forgot Password? 
-        </Link>
-      </div>
-
       {error ? <p className="mt-3 text-sm text-red-500">{error}</p> : null}
-    </>
+    </AuthModalWrapper>
   );
 }
 
-export default EmailLogin;
+export default VerifyEmailOtp;

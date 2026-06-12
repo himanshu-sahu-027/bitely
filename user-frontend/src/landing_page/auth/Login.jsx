@@ -1,54 +1,71 @@
-import { useState } from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
-import { Mail } from "lucide-react";
+import { Navigate, useLocation, Link, useNavigate } from "react-router-dom";
+import { GoogleLogin, GoogleOAuthProvider } from "@react-oauth/google";
 
 import AuthModalWrapper from "./AuthModalWrapper";
-import PhoneLogin from "./PhoneLogin";
 import EmailLogin from "./EmailLogin";
 import GoogleIcon from "./GoogleIcon";
 import AuthDivider from "./AuthDivider";
 import { useAuth } from "../../context/AuthContext";
+import { useCallback } from "react";
+import { googleSignIn } from "../../services/authService";
 
 function Login() {
-  const [mode, setMode] = useState("phone");
   const location = useLocation();
-  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const { isAuthenticated, login } = useAuth();
+
+  const redirectTo = location.state?.from?.pathname ?? "/profile";
+
+  const handleGoogleSuccess = useCallback(
+    async (credentialResponse) => {
+      const credential = credentialResponse?.credential;
+      if (!credential) return;
+
+      const response = await googleSignIn({ credential });
+
+      login(response.data);
+      navigate(redirectTo, { replace: true });
+    },
+    [login, navigate, redirectTo],
+  );
 
   if (isAuthenticated) {
-    return <Navigate to={location.state?.from?.pathname ?? "/profile"} replace />;
+    return <Navigate to={redirectTo} replace />;
   }
 
   return (
-    <AuthModalWrapper title="Log in">
-      {mode === "phone" ? <PhoneLogin /> : <EmailLogin />}
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+      <AuthModalWrapper title="Log in">
+        <EmailLogin />
 
-      <AuthDivider />
+        <AuthDivider />
 
-      {mode === "phone" && (
-        <button
-          onClick={() => setMode("email")}
-          className="mb-3 flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 py-2.5 text-sky-700 hover:bg-gray-50"
-        >
-          <Mail size={18} />
-          Continue with Email
-        </button>
-      )}
-
-      <button
-        className="flex w-full items-center justify-center gap-3
+        <GoogleLogin
+          onSuccess={handleGoogleSuccess}
+          onError={() => {
+            // keep silent; show error handling later if needed
+          }}
+          render={({ onClick }) => (
+            <button
+              type="button"
+              onClick={onClick}
+              className="flex w-full items-center justify-center gap-3
         rounded-lg border border-gray-300 py-2.5 hover:bg-gray-50"
-      >
-        <GoogleIcon />
-        Sign in with Google
-      </button>
+            >
+              <GoogleIcon />
+              Sign in with Google
+            </button>
+          )}
+        />
 
-      <p className="mt-6 text-center text-sm text-gray-500">
-        New to Bitely?{" "}
-        <Link to="/signup" className="font-semibold text-sky-600">
-          Create account
-        </Link>
-      </p>
-    </AuthModalWrapper>
+        <p className="mt-6 text-center text-sm text-gray-500">
+          New to Bitely?{" "}
+          <Link to="/signup" className="font-semibold text-sky-600">
+            Create account
+          </Link>
+        </p>
+      </AuthModalWrapper>
+    </GoogleOAuthProvider>
   );
 }
 
