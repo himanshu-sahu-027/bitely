@@ -62,9 +62,10 @@ const ensureSeedUsers = async (userIds) => {
       { email: seedEmail },
       {
         $set: {
-          full_name: "Seed User",
+          name: "Seed User",
           email: seedEmail,
-          is_email_verified: true,
+          authProvider: "email",
+          isVerified: true,
           is_active: true,
         },
       },

@@ -3,36 +3,31 @@ import AuthSession from "../models/user/authSession.model.js";
 import { generateToken } from "../utils/generateToken.js";
 
 export const loginOrSignupUser = async ({ identifier, type, full_name }) => {
+  // Temporary compatibility layer for current OTP flow.
+  // Phone auth will be removed later in Phase 2.
+  // Current codebase currently sends OTP for both email/phone; after Phase 1 schema change
+  // we only keep email working to avoid runtime errors.
   let user;
-
-  if (type === "phone") {
-    user = await User.findOne({ phone: identifier });
-
-    if (!user) {
-      user = await User.create({
-        phone: identifier,
-        full_name: full_name || "User",
-        is_phone_verified: true,
-      });
-    } else {
-      user.is_phone_verified = true;
-      await user.save();
-    }
-  }
 
   if (type === "email") {
     user = await User.findOne({ email: identifier });
 
     if (!user) {
       user = await User.create({
+        name: full_name || "User",
         email: identifier,
-        full_name: full_name || "User",
-        is_email_verified: true,
+        authProvider: "email",
+        isVerified: true,
       });
     } else {
-      user.is_email_verified = true;
+      user.isVerified = true;
+      user.authProvider = user.authProvider || "email";
       await user.save();
     }
+  }
+
+  if (!user) {
+    throw new Error("Unsupported authentication type");
   }
 
   const token = generateToken(user);

@@ -1,5 +1,4 @@
 import nodemailer from "nodemailer";
-import twilio from "twilio";
 import { config } from "../config/env.js";
 
 const buildOtpMessage = (otp) =>
@@ -27,26 +26,6 @@ const getEmailTransporter = () => {
   });
 };
 
-const getSmsClient = () => {
-  if (
-    !config.TWILIO_ACCOUNT_SID ||
-    !config.TWILIO_AUTH_TOKEN ||
-    !config.TWILIO_PHONE_NUMBER
-  ) {
-    throw new Error("SMS OTP delivery is not configured.");
-  }
-
-  return twilio(config.TWILIO_ACCOUNT_SID, config.TWILIO_AUTH_TOKEN);
-};
-
-const normalizePhoneForSms = (identifier) => {
-  if (identifier.startsWith("+")) {
-    return identifier;
-  }
-
-  return `${config.SMS_DEFAULT_COUNTRY_CODE}${identifier}`;
-};
-
 export const deliverOtp = async ({ identifier, type, otp }) => {
   const message = buildOtpMessage(otp);
 
@@ -63,16 +42,9 @@ export const deliverOtp = async ({ identifier, type, otp }) => {
     return;
   }
 
+  // Twilio/phone OTP intentionally disabled for production migration.
   if (type === "phone") {
-    const client = getSmsClient();
-
-    await client.messages.create({
-      body: message,
-      from: config.TWILIO_PHONE_NUMBER,
-      to: normalizePhoneForSms(identifier),
-    });
-
-    return;
+    throw new Error("Phone OTP delivery is disabled.");
   }
 
   throw new Error("Invalid type");

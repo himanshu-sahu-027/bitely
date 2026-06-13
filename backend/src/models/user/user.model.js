@@ -2,13 +2,31 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    full_name: { type: String, required: true },
+    name: { type: String, required: true, trim: true },
 
-    phone: { type: String, unique: true, sparse: true },
-    email: { type: String, unique: true, sparse: true },
+    email: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+      lowercase: true,
+    },
 
-    is_phone_verified: { type: Boolean, default: false },
-    is_email_verified: { type: Boolean, default: false },
+    password: {
+      type: String,
+      // Required for email provider; optional for google provider.
+      // Enforced at controller/service level.
+    },
+
+    googleId: { type: String, unique: true, sparse: true, trim: true },
+
+    authProvider: {
+      type: String,
+      enum: ["email", "google"],
+      required: true,
+    },
+
+    avatar: { type: String },
 
     role: {
       type: String,
@@ -16,9 +34,16 @@ const userSchema = new mongoose.Schema(
       default: "user",
     },
 
+    isVerified: { type: Boolean, default: false },
+
     is_active: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
+
+// Ensure email uniqueness when present
+userSchema.index({ email: 1 }, { unique: true, sparse: true });
+// Ensure googleId uniqueness when present
+userSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model("User", userSchema);

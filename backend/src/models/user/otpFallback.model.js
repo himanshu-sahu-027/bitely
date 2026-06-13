@@ -4,12 +4,15 @@ import mongoose from "mongoose";
 const otpFallbackSchema = new mongoose.Schema(
   {
     identifier: { type: String, required: true, trim: true, index: true },
+
+    // Email-only fallback storage (phone/Twilio disabled)
     type: {
       type: String,
       required: true,
-      enum: ["phone", "email"],
+      enum: ["email"],
       index: true,
     },
+
     otp: { type: String, required: true },
     expires_at: { type: Date, required: true },
     cooldown_until: { type: Date, required: true },

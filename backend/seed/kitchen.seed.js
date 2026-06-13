@@ -66,10 +66,11 @@ const ensureSeedVendors = async (vendorIds) => {
       { email: seedEmail },
       {
         $set: {
-          full_name: `Seed Vendor ${vendorId.split("_").pop()}`,
+          name: `Seed Vendor ${vendorId.split("_").pop()}`,
           email: seedEmail,
           role: "vendor",
-          is_email_verified: true,
+          authProvider: "email",
+          isVerified: true,
           is_active: true,
         },
       },

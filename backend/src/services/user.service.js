@@ -2,15 +2,15 @@ import User from "../models/user/user.model.js";
 import UserAddress from "../models/user/address.model.js";
 import { createHttpError } from "../utils/createHttpError.js";
 
-export const updateUserProfile = async ({ userId, full_name, email }) => {
+export const updateUserProfile = async ({ userId, name, email }) => {
   const user = await User.findById(userId);
 
   if (!user) {
     throw createHttpError("User not found", 404);
   }
 
-  if (full_name) {
-    user.full_name = full_name;
+  if (name) {
+    user.name = name;
   }
 
   if (email) {
@@ -21,7 +21,9 @@ export const updateUserProfile = async ({ userId, full_name, email }) => {
     }
 
     user.email = email;
-    user.is_email_verified = false;
+    // Require re-verification after email change
+    user.isVerified = false;
+    user.authProvider = user.authProvider || "email";
   }
 
   await user.save();

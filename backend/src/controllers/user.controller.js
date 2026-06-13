@@ -23,11 +23,11 @@ export const getMe = async (req, res, next) => {
 // UPDATE PROFILE
 export const updateProfile = async (req, res, next) => {
   try {
-    const { full_name, email } = req.body;
+    const { name, email } = req.body;
 
     const user = await updateUserProfile({
       userId: req.user._id,
-      full_name,
+      name,
       email,
     });
 
