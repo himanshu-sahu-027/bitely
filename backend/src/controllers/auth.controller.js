@@ -87,7 +87,7 @@ export const verifyOTPAndLogin = async (req, res, next) => {
 };
 
 // =======================
-// Phase 3: Register
+// Register
 // =======================
 export const register = async (req, res, next) => {
   try {
@@ -152,7 +152,7 @@ export const register = async (req, res, next) => {
 };
 
 // =======================
-// Phase 3: Verify Email
+//  Verify Email
 // =======================
 export const verifyEmail = async (req, res, next) => {
   try {
@@ -230,7 +230,7 @@ export const verifyEmail = async (req, res, next) => {
 };
 
 // =======================
-// Phase 4: Login (email+password)
+// Login (email+password)
 // =======================
 export const login = async (req, res, next) => {
   try {
@@ -287,7 +287,7 @@ export const login = async (req, res, next) => {
 };
 
 // =======================
-// Phase 5: Google Sign-In
+// Google Sign-In
 // =======================
 export const googleSignIn = async (req, res, next) => {
   try {
@@ -371,7 +371,7 @@ export const googleSignIn = async (req, res, next) => {
 };
 
 // =======================
-// Phase 6: Forgot Password
+//  Forgot Password
 // =======================
 export const forgotPassword = async (req, res, next) => {
   try {
@@ -423,7 +423,7 @@ export const forgotPassword = async (req, res, next) => {
 };
 
 // =======================
-// Phase 6: Reset Password
+//  Reset Password
 // =======================
 export const resetPassword = async (req, res, next) => {
   try {

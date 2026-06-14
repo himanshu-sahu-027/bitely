@@ -179,54 +179,6 @@
 .profile-btn:hover {
   opacity: 0.9;
 }
-/* ---------------- SEARCH BAR ---------------- */
-
-
-.navbar-search {
-  display: flex;
-  align-items: center;
-  background: #e9eaed;
-
-  padding: clamp(0.35rem, 0.7vw, 0.5rem)
-           clamp(0.8rem, 1.5vw, 1.2rem);
-
-  border-radius: 999rem;
-
-  width: clamp(10rem, 28vw, 40rem);  
-  margin-left: clamp(0.4rem, 1vw, 1rem); /* space after logo */
-
-  flex-shrink: 1;   /* allow shrinking */
-
-  transition: all 0.2s ease;
-}
-
-.navbar-search:hover {
-  background: #e6e8eb;
-}
-
-.navbar-search:focus-within {
-  background: #e1e5ec;
-  transform: scale(1.02);
-}
-
-/* search icon */
-
-.search-icon {
-  color: #6b7280;
-  margin-right: 0.35rem;
-}
-
-/* input field */
-
-.search-input {
-  border: none;
-  background: transparent;
-  outline: none;
-
-  width: 100%;
-
-  font-size: clamp(0.75rem, 0.9vw, 0.9rem);
-}
 
 
 
@@ -360,9 +312,9 @@
 
 /* hide signup button on medium screens */
 
-@media (max-width: 1100px) {
+@media (max-width:500px) {
 
-  .signup-btn {
+  .login-btn {
     display: none;
   }
 

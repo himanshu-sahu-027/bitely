@@ -8,6 +8,7 @@ import {
   Food,
   FoodCategory,
   PopularFood,
+  Kitchen,
 } from "../models/kitchenCatalog/index.js";
 import { createHttpError } from "../utils/createHttpError.js";
 import { parsePagination } from "../utils/pagination.js";
@@ -197,6 +198,50 @@ export const getPopularFoods = async (req, res, next) => {
             categoryId: String(item.food_id.category_id),
           },
         })),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const searchFoodsAndKitchens = async (req, res, next) => {
+  try {
+    const query = req.query.q?.trim();
+
+    if (!query) {
+      return sendResponse(res, {
+        message: "Search results",
+        data: {
+          foods: [],
+          kitchens: [],
+        },
+      });
+    }
+
+    const foods = await Food.find({
+      name: {
+        $regex: query,
+        $options: "i",
+      },
+    })
+      .limit(10)
+      .lean();
+
+    const kitchens = await Kitchen.find({
+      name: {
+        $regex: query,
+        $options: "i",
+      },
+    })
+      .limit(10)
+      .lean();
+
+    sendResponse(res, {
+      message: "Search results fetched successfully",
+      data: {
+        foods,
+        kitchens,
+      },
     });
   } catch (err) {
     next(err);

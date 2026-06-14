@@ -3,6 +3,7 @@ import { Home, Info, ShoppingCart, User, Search } from "lucide-react";
 import { useCart } from "../../../context/CartContext";
 import { useAuth } from "../../../context/AuthContext";
 import logo from "../../../assets/logo/logo.png";
+import SearchBar from "../../search/SearchBar";
 import "./Navbar.css";
 
 function Navbar() {
@@ -11,7 +12,7 @@ function Navbar() {
   const { isAuthenticated } = useAuth();
   const totalQuantity = cart.items.reduce(
     (sum, item) => sum + item.quantity,
-    0
+    0,
   );
 
   const navItems = [
@@ -31,14 +32,8 @@ function Navbar() {
         </Link>
 
         {/* search bar */}
-        <div className="navbar-search">
-          <Search size={18} className="search-icon" />
-
-          <input
-            type="text"
-            placeholder="Search food or kitchen..."
-            className="search-input"
-          />
+        <div className="flex-1 flex justify-center min-w-0">
+          <SearchBar />
         </div>
 
         {/* Navigation */}
@@ -80,7 +75,7 @@ function Navbar() {
 
           {/* Profile */}
           <Link to="/profile" className="profile-btn" aria-label="Profile">
-              <User size={18} />
+            <User size={18} />
           </Link>
         </div>
       </div>

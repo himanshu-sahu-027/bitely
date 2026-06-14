@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import { Home,  ShoppingCart, User, Search } from "lucide-react";
+import SearchBar from "../search/SearchBar";
 
 function MobileNav() {
   return (
@@ -12,15 +13,9 @@ function MobileNav() {
           Home
         </Link>
 
-        <Link to="/orders" className="flex flex-col items-center text-sm">
-          <Search />
-          Search
-        </Link>
+        <SearchBar/>
 
-        <Link to="/chat" className="flex flex-col items-center text-sm">
-          <ShoppingCart />
-          Cart
-        </Link>
+
 
         <Link to="/profile" className="flex flex-col items-center text-sm">
           <User />

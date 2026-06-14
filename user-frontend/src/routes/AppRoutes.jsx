@@ -23,6 +23,8 @@ import ProtectedRoute from "./ProtectedRoute";
 
 import { Footer, Navbar } from "../components/layout";
 import TopAccessNotice from "../components/layout/TopAccessNotice";
+import SearchResultsPage from "../components/search/SearchResultPage";
+
 import ForgotPassword from "../landing_page/auth/ForgotPassword";
 import ResetPassword from "../landing_page/auth/ResetPassword";
 
@@ -70,6 +72,7 @@ function AppContent() {
 
       <Routes location={backgroundLocation}>
         <Route path="/" element={<Home />} />
+        <Route path="/search" element={<SearchResultsPage />} />
         <Route path="/about" element={<About />} />
         <Route path="/food/:slug" element={<KitchensByFoodPage />} />
         <Route path="/cart" element={<Cart />} />
@@ -98,6 +101,8 @@ function AppContent() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
         <Route path="/reset-password" element={<ResetPassword />} />
+
+        
 
         <Route path="*" element={<NotFound />} />
       </Routes>
