@@ -3,10 +3,7 @@ import AuthSession from "../models/user/authSession.model.js";
 import { generateToken } from "../utils/generateToken.js";
 
 export const loginOrSignupUser = async ({ identifier, type, full_name }) => {
-  // Temporary compatibility layer for current OTP flow.
-  // Phone auth will be removed later in Phase 2.
-  // Current codebase currently sends OTP for both email/phone; after Phase 1 schema change
-  // we only keep email working to avoid runtime errors.
+  
   let user;
 
   if (type === "email") {

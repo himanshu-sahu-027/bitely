@@ -5,6 +5,7 @@ import { KitchenBanner } from "../../components/kitchen";
 import FloatingCart from "../cart/cartComponents/FloatingCart";
 import { useParams } from "react-router-dom";
 import { fetchRestaurantDetails } from "../../services/restaurantService";
+import ReviewList from "../../components/review/ReviewList";
 
 function KitchenPage() {
   const [open, setOpen] = useState(false);
@@ -61,9 +62,7 @@ function KitchenPage() {
 
   if (error || !kitchenPage?.kitchen) {
     return (
-      <div className="p-6 text-center">
-        {error || "Kitchen not found"}
-      </div>
+      <div className="p-6 text-center">{error || "Kitchen not found"}</div>
     );
   }
   const kitchen = {
@@ -77,17 +76,14 @@ function KitchenPage() {
 
   return (
     <div>
-      <KitchenBanner 
-        kitchen={kitchen}
-      />
-       <CategoryMenu
+      <KitchenBanner kitchen={kitchen} />
+
+      <ReviewList kitchenId={id} />
+      <CategoryMenu
         categories={kitchenPage.categories}
         onSelect={setSelectedCategory}
       />
-      <MenuSection
-        title={selectedCategory}
-        foods={visibleMenuItems}
-      />
+      <MenuSection title={selectedCategory} foods={visibleMenuItems} />
 
       {open && (
         <ChatWindow

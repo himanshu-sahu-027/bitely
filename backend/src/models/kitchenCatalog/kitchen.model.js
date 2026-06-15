@@ -9,13 +9,23 @@ const kitchenSchema = new mongoose.Schema(
       index: true,
     },
     name: { type: String, required: true, trim: true },
-    rating: { type: Number, min: 0, max: 5, default: 0 },
+    rating: {
+      type: Number,
+      min: 0,
+      max: 5,
+      default: 0,
+    },
+
+    totalRatings: {
+      type: Number,
+      default: 0,
+    },
     delivery_time: { type: String, trim: true },
     imageUrl: { type: String, trim: true },
     address: { type: String, trim: true },
     last_order_time: { type: String, trim: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const Kitchen =

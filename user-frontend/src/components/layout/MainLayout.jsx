@@ -1,7 +1,6 @@
 // global layout component, used to wrap all pages 
 import Navbar from "./desktop_navbar/Navbar"
 import Footer from "./Footer"
-import MobileNav from "./MobileNav"
 
 
 function MainLayout({ children }) {
@@ -14,7 +13,6 @@ function MainLayout({ children }) {
         {children}
       </main>
       <Footer />
-      <MobileNav />
 
     </div>
   )

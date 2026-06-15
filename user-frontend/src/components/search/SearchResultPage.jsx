@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, Store, UtensilsCrossed } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Search, Store } from "lucide-react";
+
+import FoodCard from "../food/FoodCard";
+import KitchenCard from "../kitchen/KitchenCard";
 
 import { searchFoodsAndKitchens } from "../../services/searchService";
 
 function SearchResultsPage() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const query = searchParams.get("q") || "";
@@ -49,7 +51,7 @@ function SearchResultsPage() {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-12">
-        <h1 className="text-3xl font-bold mb-6">Searching...</h1>
+        <h1 className="text-3xl font-bold mb-6 text-blue-900">Searching...</h1>
       </div>
     );
   }
@@ -75,13 +77,6 @@ function SearchResultsPage() {
   const showKitchenSection =
     (activeTab === "all" || activeTab === "kitchens") &&
     results.kitchens.length > 0;
-
-  const activeTabHasNoResults =
-    activeTab === "foods"
-      ? results.foods.length === 0
-      : activeTab === "kitchens"
-        ? results.kitchens.length === 0
-        : false;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
@@ -133,17 +128,10 @@ function SearchResultsPage() {
         </div>
       )}
 
-      {activeTabHasNoResults && (
-        <div className="bg-white border rounded-xl p-8 text-center">
-          No {activeTab} found for "{query}"
-        </div>
-      )}
 
       {showFoodSection && (
         <section className="mb-10">
           <div className="flex items-center gap-2 mb-5">
-            <UtensilsCrossed />
-
             <h2 className="text-2xl font-semibold">Foods</h2>
 
             <span className="text-gray-500">
@@ -153,25 +141,15 @@ function SearchResultsPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {results.foods.map((food) => (
-              <div
-                key={food._id}
-                className="bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer"
-                onClick={() =>
-                  navigate(
-                    `/food/${food.slug || food._id}`
-                  )
-                }
-              >
-                <h3 className="font-semibold text-lg">
-                  {food.name}
-                </h3>
-
-                {food.description && (
-                  <p className="text-sm text-gray-500 mt-2 line-clamp-2">
-                    {food.description}
-                  </p>
-                )}
-              </div>
+              <FoodCard
+                key={food.id}
+                id={food.id}
+                name={food.name}
+                image={food.image}
+                price={food.price}
+                rating={food.rating}
+                kitchen={food.kitchen}
+              />
             ))}
           </div>
         </section>
@@ -191,23 +169,17 @@ function SearchResultsPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {results.kitchens.map((kitchen) => (
-              <div
-                key={kitchen._id}
-                className="bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer"
-                onClick={() =>
-                  navigate(`/kitchen/${kitchen._id}`)
-                }
-              >
-                <h3 className="font-semibold text-lg">
-                  {kitchen.name}
-                </h3>
-
-                {kitchen.address && (
-                  <p className="text-sm text-gray-500 mt-2">
-                    {kitchen.address}
-                  </p>
-                )}
-              </div>
+              <KitchenCard
+                key={kitchen.id ?? kitchen._id}
+                id={kitchen.id ?? kitchen._id}
+                name={kitchen.name}
+                image={kitchen.image}
+                showMenuImg={kitchen.showMenuImg}
+                rating={kitchen.rating}
+                address={kitchen.address}
+                deliveryTime={kitchen.deliveryTime}
+                lastOrderTime={kitchen.lastOrderTime}
+              />
             ))}
           </div>
         </section>

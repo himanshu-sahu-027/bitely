@@ -9,6 +9,7 @@ import {
   FoodCategory,
   PopularFood,
   Kitchen,
+  Menu,
 } from "../models/kitchenCatalog/index.js";
 import { createHttpError } from "../utils/createHttpError.js";
 import { parsePagination } from "../utils/pagination.js";
@@ -218,15 +219,7 @@ export const searchFoodsAndKitchens = async (req, res, next) => {
       });
     }
 
-    const foods = await Food.find({
-      name: {
-        $regex: query,
-        $options: "i",
-      },
-    })
-      .limit(10)
-      .lean();
-
+    // Kitchens search (for KitchenCard)
     const kitchens = await Kitchen.find({
       name: {
         $regex: query,
@@ -236,11 +229,53 @@ export const searchFoodsAndKitchens = async (req, res, next) => {
       .limit(10)
       .lean();
 
+    const kitchensPayload = kitchens.map((k) => ({
+      id: String(k._id),
+      name: k.name,
+      image: k.imageUrl || "",
+      showMenuImg: k.imageUrl || "",
+      rating: k.rating ?? 0,
+      address: k.address || "",
+      deliveryTime: k.delivery_time || k.deliveryTime || "",
+      lastOrderTime: k.last_order_time || k.lastOrderTime || "",
+    }));
+
+    // Foods search should be powered by Menu items so we have:
+    // price, rating, imageUrl + associated kitchen + food name
+    // (Food model itself doesn't store these).
+    const menuItems = await Menu.find({
+      name: { $regex: query, $options: "i" },
+    })
+      .populate(
+        "kitchen_id",
+        "name rating delivery_time imageUrl address last_order_time"
+      )
+      .populate("food_id", "name slug")
+      .limit(10)
+      .lean();
+
+    const foodsPayload = menuItems
+      .filter((m) => m.kitchen_id && m.food_id)
+      .map((m) => ({
+        id: String(m.food_id._id),
+        name: m.food_id.name,
+        slug: m.food_id.slug,
+        image: m.imageUrl || "",
+        price: m.price ?? 0,
+        rating: m.rating ?? 0,
+        kitchen: {
+          id: String(m.kitchen_id._id),
+          name: m.kitchen_id.name,
+          deliveryTime:
+            m.kitchen_id.delivery_time || m.kitchen_id.deliveryTime || "",
+        },
+      }));
+
     sendResponse(res, {
       message: "Search results fetched successfully",
       data: {
-        foods,
-        kitchens,
+        foods: foodsPayload,
+        kitchens: kitchensPayload,
       },
     });
   } catch (err) {
