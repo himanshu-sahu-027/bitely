@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const orderStatusHistorySchema = new mongoose.Schema(
   {
-    order_id: {
+    orderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Order",
       required: true,
@@ -19,12 +19,12 @@ const orderStatusHistorySchema = new mongoose.Schema(
       required: true,
     },
     message: { type: String, trim: true, required: true },
-    created_at: { type: Date, required: true },
+    createdAt: { type: Date, required: true },
   },
   { timestamps: false }
 );
 
-orderStatusHistorySchema.index({ order_id: 1, created_at: 1 });
+orderStatusHistorySchema.index({ orderId: 1, createdAt: 1 });
 
 const OrderStatusHistory =
   mongoose.models.OrderStatusHistory ||

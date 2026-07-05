@@ -16,14 +16,14 @@ const buildCreateOrderItems = async (items = []) => {
     throw createHttpError("Order items are required", 400);
   }
 
-  const menuIds = items.map((item) => item.menu_id);
+  const menuIds = items.map((item) => item.menuId);
   const menus = await Menu.find({ _id: { $in: menuIds } }).lean();
   const menuById = Object.fromEntries(
     menus.map((menu) => [String(menu._id), menu])
   );
 
   return items.map((item) => {
-    const menu = menuById[String(item.menu_id)];
+    const menu = menuById[String(item.menuId)];
 
     if (!menu) {
       throw createHttpError("Menu item not found", 404);
@@ -36,11 +36,11 @@ const buildCreateOrderItems = async (items = []) => {
     }
 
     return {
-      menu_id: menu._id,
-      kitchen_id: menu.kitchen_id,
+      menuId: menu._id,
+      kitchenId: menu.kitchenId,
       name: menu.name,
       price: menu.price,
-      image_url: menu.imageUrl,
+      imageUrl: menu.imageUrl,
       quantity,
     };
   });
@@ -48,18 +48,18 @@ const buildCreateOrderItems = async (items = []) => {
 
 export const prepareCreateOrderData = async ({
   userId,
-  kitchen_id,
-  payment_method,
-  payment_status,
+  kitchenId,
+  paymentMethod,
+  paymentStatus,
   instructions,
   items = [],
   pricing = {},
 }) => {
-  if (!kitchen_id || !payment_method) {
+  if (!kitchenId || !paymentMethod) {
     throw createHttpError("Required fields missing", 400);
   }
 
-  const kitchen = await Kitchen.findById(kitchen_id).lean();
+  const kitchen = await Kitchen.findById(kitchenId).lean();
 
   if (!kitchen) {
     throw createHttpError("Kitchen not found", 404);
@@ -69,72 +69,72 @@ export const prepareCreateOrderData = async ({
 
   if (
     normalizedItems.some(
-      (item) => String(item.kitchen_id) !== String(kitchen._id)
+      (item) => String(item.kitchenId) !== String(kitchen._id)
     )
   ) {
-    throw createHttpError(
-      "All order items must belong to the same kitchen",
-      400
-    );
+    throw createHttpError("All order items must belong to the same kitchen", 400);
   }
 
   return {
-    user_id: userId,
-    kitchen_id: kitchen._id,
-    kitchen_name: kitchen.name,
-    kitchen_image_url: kitchen.imageUrl,
-    payment_method,
-    payment_status,
+    userId,
+    kitchenId: kitchen._id,
+    kitchenName: kitchen.name,
+    kitchenImageUrl: kitchen.imageUrl,
+    paymentMethod,
+    paymentStatus,
     instructions,
-    items: normalizedItems.map(({ kitchen_id: _kitchenId, ...item }) => item),
+    items: normalizedItems,
     pricingInput: pricing,
   };
 };
 
 export const createOrder = async ({
-  user_id,
-  kitchen_id,
-  kitchen_name,
-  kitchen_image_url,
-  payment_method,
-  payment_status = "pending",
+  userId,
+  kitchenId,
+  kitchenName,
+  kitchenImageUrl,
+  paymentMethod,
+  paymentStatus = "pending",
   instructions,
   items = [],
   pricingInput = {},
 }) => {
+  // SECURITY: pricingInput must not be trusted from client.
+  // Calculate pricing only from trusted item data (menu prices) and ignore client pricing fields.
   const pricing = calculatePriceBreakdown({
     items,
-    ...pricingInput,
+    // fallback to empty pricing input (no client overrides)
+    pricingInput: {},
   });
 
   const order = await Order.create({
-    user_id,
-    kitchen_id,
-    kitchen_name,
-    kitchen_image_url,
+    userId,
+    kitchenId,
+    kitchenName,
+    kitchenImageUrl,
     status: "placed",
-    placed_at: new Date(),
-    payment_method,
-    payment_status,
-    total_amount: pricing.final_total,
+    placedAt: new Date(),
+    paymentMethod,
+    paymentStatus,
+    totalAmount: pricing.finalTotal,
     instructions,
   });
 
   if (items.length > 0) {
     await OrderItem.insertMany(
       items.map((item) => ({
-        order_id: order._id,
-        menu_id: item.menu_id,
+        orderId: order._id,
+        menuId: item.menuId,
         name: item.name,
         price: item.price,
-        image_url: item.image_url,
+        imageUrl: item.imageUrl,
         quantity: item.quantity,
       }))
     );
   }
 
   await OrderPricing.create({
-    order_id: order._id,
+    orderId: order._id,
     ...pricing,
   });
 
@@ -166,7 +166,7 @@ export const cancelOrder = async (orderId) => {
   }
 
   order.status = "cancelled";
-  order.cancelled_at = new Date();
+  order.cancelledAt = new Date();
   await order.save();
 
   await OrderStatusHistory.create(

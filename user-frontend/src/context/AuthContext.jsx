@@ -79,6 +79,9 @@ export function AuthProvider({ children }) {
       } catch {
         if (!ignore) {
           setSession(null);
+          window.alert(
+            "We couldn't verify your session. Please log in again.",
+          );
         }
       } finally {
         if (!ignore) {
@@ -108,6 +111,9 @@ export function AuthProvider({ children }) {
             await logoutUser();
           }
         } catch {
+          window.alert(
+            "Server logout failed. Your account has been logged out locally.",
+          );
           // Clear stale sessions locally even if the API call fails.
         } finally {
           setSession(null);

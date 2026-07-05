@@ -7,6 +7,48 @@ import Order from "../models/orderCatalog/order.model.js";
 import { sendResponse } from "../utils/sendResponse.js";
 import { createHttpError } from "../utils/createHttpError.js";
 
+const updateKitchenRating = async (kitchenId) => {
+  const stats = await KitchenReview.aggregate([
+    { $match: { kitchen_id: kitchenId } },
+    {
+      $group: {
+        _id: null,
+        averageRating: { $avg: "$rating" },
+        totalRatings: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const averageRating = stats.length ? stats[0].averageRating : 0;
+  const totalRatings = stats.length ? stats[0].totalRatings : 0;
+
+  await Kitchen.findByIdAndUpdate(kitchenId, {
+    rating: averageRating,
+    totalRatings,
+  });
+};
+
+const updateFoodRating = async (menuId) => {
+  const stats = await FoodReview.aggregate([
+    { $match: { menu_id: menuId } },
+    {
+      $group: {
+        _id: null,
+        averageRating: { $avg: "$rating" },
+        totalRatings: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const averageRating = stats.length ? stats[0].averageRating : 0;
+  const totalRatings = stats.length ? stats[0].totalRatings : 0;
+
+  await Menu.findByIdAndUpdate(menuId, {
+    rating: averageRating,
+    totalRatings,
+  });
+};
+
 // add kitchen review
 export const addKitchenReview = async (req, res, next) => {
   try {
@@ -25,8 +67,8 @@ export const addKitchenReview = async (req, res, next) => {
     }
 
     const existingReview = await KitchenReview.findOne({
+      order_id: orderId,
       kitchen_id: kitchenId,
-      user_id: req.user._id,
     });
 
     if (existingReview) {
@@ -42,17 +84,7 @@ export const addKitchenReview = async (req, res, next) => {
     });
 
 
-    const reviews = await KitchenReview.find({
-      kitchen_id: kitchenId,
-    });
-
-    const average =
-      reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length;
-
-    await Kitchen.findByIdAndUpdate(kitchenId, {
-      rating: average,
-      totalRatings: reviews.length,
-    });
+    await updateKitchenRating(kitchenId);
 
     return sendResponse(res, {
       message: "Kitchen review added successfully",
@@ -115,8 +147,8 @@ export const addFoodReview = async (req, res, next) => {
     }
 
     const exists = await FoodReview.findOne({
+      order_id: orderId,
       menu_id: menuId,
-      user_id: req.user._id,
     });
 
     if (exists) {
@@ -132,17 +164,7 @@ export const addFoodReview = async (req, res, next) => {
       review,
     });
 
-    const reviews = await FoodReview.find({
-      menu_id: menuId,
-    });
-
-    const average =
-      reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length;
-
-    await Menu.findByIdAndUpdate(menuId, {
-      rating: average,
-      totalRatings: reviews.length,
-    });
+    await updateFoodRating(menuId);
 
     return sendResponse(res, {
       message: "Food review added successfully",
@@ -185,18 +207,7 @@ export const updateKitchenReview = async (req, res, next) => {
 
     await review.save();
 
-    const reviews = await KitchenReview.find({
-      kitchen_id: review.kitchen_id,
-    });
-
-    const average = reviews.length
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-      : 0;
-
-    await Kitchen.findByIdAndUpdate(review.kitchen_id, {
-      rating: average,
-      totalRatings: reviews.length,
-    });
+    await updateKitchenRating(review.kitchen_id);
 
     return sendResponse(res, {
       message: "Review updated successfully",
@@ -218,18 +229,7 @@ export const deleteKitchenReview = async (req, res, next) => {
       throw createHttpError("Review not found", 404);
     }
 
-    const reviews = await KitchenReview.find({
-      kitchen_id: review.kitchen_id,
-    });
-
-    const average = reviews.length
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-      : 0;
-
-    await Kitchen.findByIdAndUpdate(review.kitchen_id, {
-      rating: average,
-      totalRatings: reviews.length,
-    });
+    await updateKitchenRating(review.kitchen_id);
 
     return sendResponse(res, {
       message: "Review deleted successfully",
@@ -255,18 +255,7 @@ export const updateFoodReview = async (req, res, next) => {
 
     await review.save();
 
-    const reviews = await FoodReview.find({
-      menu_id: review.menu_id,
-    });
-
-    const average = reviews.length
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-      : 0;
-
-    await Menu.findByIdAndUpdate(review.menu_id, {
-      rating: average,
-      totalRatings: reviews.length,
-    });
+    await updateFoodRating(review.menu_id);
 
     return sendResponse(res, {
       message: "Review updated successfully",
@@ -288,18 +277,7 @@ export const deleteFoodReview = async (req, res, next) => {
       throw createHttpError("Review not found", 404);
     }
 
-    const reviews = await FoodReview.find({
-      menu_id: review.menu_id,
-    });
-
-    const average = reviews.length
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-      : 0;
-
-    await Menu.findByIdAndUpdate(review.menu_id, {
-      rating: average,
-      totalRatings: reviews.length,
-    });
+    await updateFoodRating(review.menu_id);
 
     return sendResponse(res, {
       message: "Review deleted successfully",

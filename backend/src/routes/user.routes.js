@@ -13,17 +13,44 @@ import { protect } from "../middlewares/auth.middleware.js";
 import { validateBody } from "../middlewares/validateRequest.middleware.js";
 import { roleAuthorize } from "../middlewares/roleAuthorize.middleware.js";
 import { validateLocationPayload } from "../validators/location.validator.js";
+import {
+  validateUpdateProfilePayload,
+  validateCreateAddressPayload,
+  validateUpdateAddressPayload,
+} from "../validators/user.validator.js";
+
 
 const router = express.Router();
 
 // profile
 router.get("/me", protect, roleAuthorize("user", "vendor", "admin"), getMe);
-router.put("/update-profile", protect, roleAuthorize("user", "vendor", "admin"), updateProfile);
+router.put(
+  "/update-profile",
+  protect,
+  roleAuthorize("user", "vendor", "admin"),
+  validateBody(validateUpdateProfilePayload),
+  updateProfile,
+);
+
 
 // address
-router.post("/address", protect, roleAuthorize("user", "vendor", "admin"), addAddress);
+router.post(
+  "/address",
+  protect,
+  roleAuthorize("user", "vendor", "admin"),
+  validateBody(validateCreateAddressPayload),
+  addAddress,
+);
+
 router.get("/address", protect, roleAuthorize("user", "vendor", "admin"), getAddresses);
-router.put("/address/:id", protect, roleAuthorize("user", "vendor", "admin"), updateAddress);
+router.put(
+  "/address/:id",
+  protect,
+  roleAuthorize("user", "vendor", "admin"),
+  validateBody(validateUpdateAddressPayload),
+  updateAddress,
+);
+
 router.delete("/address/:id", protect, roleAuthorize("user", "vendor", "admin"), deleteAddress);
 router.post(
   "/location",

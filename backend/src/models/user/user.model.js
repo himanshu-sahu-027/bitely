@@ -41,9 +41,5 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Ensure email uniqueness when present
-userSchema.index({ email: 1 }, { unique: true, sparse: true });
-// Ensure googleId uniqueness when present
-userSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model("User", userSchema);

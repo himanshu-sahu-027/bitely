@@ -20,78 +20,83 @@ const normalizeKitchen = (kitchen) => ({
   name: kitchen.name,
   image: kitchen.imageUrl,
   address: kitchen.address,
-  deliveryTime: kitchen.delivery_time,
+  deliveryTime: kitchen.deliveryTime,
 });
 
 const normalizeAddress = (address) => ({
   id: String(address._id),
   label: address.label,
-  fullAddress: [address.address_line, address.city, address.state, address.pincode]
+  fullAddress: [
+    address.addressLine,
+    address.city,
+    address.state,
+    address.pincode,
+  ]
     .filter(Boolean)
     .join(", "),
-  is_default: address.is_default,
+  isDefault: address.isDefault,
 });
 
 const normalizeOrder = (order) => ({
   id: String(order._id),
-  user_id: String(order.user_id),
-  kitchen_id: String(order.kitchen_id?._id ?? order.kitchen_id),
-  kitchen_name: order.kitchen_name,
-  kitchen_image: order.kitchen_image_url,
+  userId: String(order.userId),
+  kitchenId: String(order.kitchenId?._id ?? order.kitchenId),
+  kitchenName: order.kitchenName,
+  kitchenImageUrl: order.kitchenImageUrl,
   status: order.status,
-  placed_at: order.placed_at,
-  delivered_at: order.delivered_at,
-  cancelled_at: order.cancelled_at,
-  delivery_by_time: order.delivery_by_time,
-  last_cancellation_time: order.last_cancellation_time,
-  payment_method: order.payment_method,
-  payment_status: order.payment_status,
-  total_amount: order.total_amount,
+  placedAt: order.placedAt,
+  deliveredAt: order.deliveredAt,
+  cancelledAt: order.cancelledAt,
+  deliveryByTime: order.deliveryByTime,
+  lastCancellationTime: order.lastCancellationTime,
+  paymentMethod: order.paymentMethod,
+  paymentStatus: order.paymentStatus,
+  totalAmount: order.totalAmount,
   instructions: order.instructions,
-  created_at: order.created_at,
+  createdAt: order.createdAt,
 });
 
 const normalizeOrderItem = (item) => ({
   id: String(item._id),
-  order_id: String(item.order_id),
-  menu_id: String(item.menu_id),
+  orderId: String(item.orderId),
+  menuId: String(item.menuId),
   name: item.name,
   price: item.price,
-  image: item.image_url,
+  image: item.imageUrl,
   quantity: item.quantity,
 });
 
 const normalizeOrderPricing = (pricing) => ({
   id: String(pricing._id),
-  order_id: String(pricing.order_id),
-  item_total: pricing.item_total,
-  packaging_fee: pricing.packaging_fee,
-  platform_fee: pricing.platform_fee,
+  orderId: String(pricing.orderId),
+  itemTotal: pricing.itemTotal,
+  packagingFee: pricing.packagingFee,
+  platformFee: pricing.platformFee,
   discount: pricing.discount,
-  delivery_fee: pricing.delivery_fee,
+  deliveryFee: pricing.deliveryFee,
   tax: pricing.tax,
-  final_total: pricing.final_total,
+  finalTotal: pricing.finalTotal,
 });
 
 const normalizeOrderStatusHistory = (entry) => ({
   id: String(entry._id),
-  order_id: String(entry.order_id),
+  orderId: String(entry.orderId),
   status: entry.status,
   message: entry.message,
-  created_at: entry.created_at,
+  createdAt: entry.createdAt,
 });
 
 const assertOrderAccess = (order, actor = {}) => {
   if (actor.role === "admin") return;
 
-  if (actor.role === "vendor" && actor.kitchen_id) {
-    if (String(order.kitchen_id) !== String(actor.kitchen_id)) {
+  if (actor.role === "vendor" && actor.kitchenId) {
+    if (String(order.kitchenId) !== String(actor.kitchenId)) {
       throw createHttpError("Unauthorized", 403);
     }
     return;
   }
 
-  if (!actor.user_id || String(order.user_id) !== String(actor.user_id)) {
+  if (!actor.userId || String(order.userId) !== String(actor.userId)) {
     throw createHttpError("Unauthorized", 403);
   }
 };
@@ -101,12 +106,14 @@ const assertOrderAccess = (order, actor = {}) => {
 export const getUserProfileOrders = async (userId) => {
   const [orders, orderItems, orderPricing, orderStatusHistory, kitchens, addresses] =
     await Promise.all([
-      Order.find({ user_id: userId }).sort({ created_at: -1 }).lean(),
+      Order.find({ userId: userId }).sort({ createdAt: -1 }).lean(),
       OrderItem.find().lean(),
       OrderPricing.find().lean(),
-      OrderStatusHistory.find().sort({ created_at: 1 }).lean(),
+      OrderStatusHistory.find().sort({ createdAt: 1 }).lean(),
       Kitchen.find().lean(),
-      UserAddress.find({ user_id: userId }).sort({ is_default: -1, createdAt: 1 }).lean(),
+      UserAddress.find({ userId: userId })
+        .sort({ isDefault: -1, createdAt: 1 })
+        .lean(),
     ]);
 
   return buildProfileOrders({
@@ -131,10 +138,10 @@ export const listOrders = async ({
 } = {}) => {
   const query = {};
 
-  if (actor.role === "vendor" && actor.kitchen_id) {
-    query.kitchen_id = actor.kitchen_id;
-  } else if (actor.role !== "admin" && actor.user_id) {
-    query.user_id = actor.user_id;
+  if (actor.role === "vendor" && actor.kitchenId) {
+    query.kitchenId = actor.kitchenId;
+  } else if (actor.role !== "admin" && actor.userId) {
+    query.userId = actor.userId;
   }
 
   if (status) {
@@ -142,18 +149,18 @@ export const listOrders = async ({
   }
 
   if (dateFrom || dateTo) {
-    query.placed_at = {};
-    if (dateFrom) query.placed_at.$gte = new Date(dateFrom);
-    if (dateTo) query.placed_at.$lte = new Date(dateTo);
+    query.placedAt = {};
+    if (dateFrom) query.placedAt.$gte = new Date(dateFrom);
+    if (dateTo) query.placedAt.$lte = new Date(dateTo);
   }
 
   if (search) {
-    query.kitchen_name = { $regex: String(search), $options: "i" };
+    query.kitchenName = { $regex: String(search), $options: "i" };
   }
 
   const [orders, total] = await Promise.all([
     Order.find(query)
-      .sort({ placed_at: sort === "asc" ? 1 : -1 })
+      .sort({ placedAt: sort === "asc" ? 1 : -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean(),
@@ -170,12 +177,14 @@ export const getOrderDetails = async ({ orderId, actor = {} }) => {
   const [order, items, pricing, payment, statusHistory, populatedOrder, addresses] =
     await Promise.all([
       Order.findById(orderId).lean(),
-      OrderItem.find({ order_id: orderId }).lean(),
-      OrderPricing.findOne({ order_id: orderId }).lean(),
-      Payment.findOne({ order_id: orderId }).lean(),
-      OrderStatusHistory.find({ order_id: orderId }).sort({ created_at: 1 }).lean(),
-      Order.findById(orderId).populate("kitchen_id").lean(),
-      actor.user_id ? UserAddress.find({ user_id: actor.user_id }).lean() : [],
+      OrderItem.find({ orderId: orderId }).lean(),
+      OrderPricing.findOne({ orderId: orderId }).lean(),
+      Payment.findOne({ orderId: orderId }).lean(),
+      OrderStatusHistory.find({ orderId: orderId })
+        .sort({ createdAt: 1 })
+        .lean(),
+      Order.findById(orderId).populate("kitchenId").lean(),
+      actor.userId ? UserAddress.find({ userId: actor.userId }).lean() : [],
     ]);
 
   if (!order) {
@@ -184,21 +193,32 @@ export const getOrderDetails = async ({ orderId, actor = {} }) => {
 
   assertOrderAccess(order, actor);
 
-  const normalizedKitchen = populatedOrder?.kitchen_id?.name
-    ? normalizeKitchen(populatedOrder.kitchen_id)
+  const normalizedKitchen = populatedOrder?.kitchenId?.name
+    ? normalizeKitchen(populatedOrder.kitchenId)
     : null;
   const etaMins = calculateEtaMinutes(normalizedKitchen?.deliveryTime);
+
+  const sanitizedPayment = payment
+    ? {
+        status: payment.status,
+        method: payment.method,
+        transactionId: payment.transactionId,
+        amount: payment.amount,
+        gateway: payment.gateway,
+        paidAt: payment.paidAt,
+      }
+    : null;
 
   return {
     order: normalizeOrder(order),
     items: items.map(normalizeOrderItem),
     pricing: pricing ? normalizeOrderPricing(pricing) : null,
-    payment,
+    payment: sanitizedPayment,
     statusHistory: statusHistory.map(normalizeOrderStatusHistory),
     kitchen: normalizedKitchen,
     addresses: addresses.map(normalizeAddress),
     delivery: estimateDeliveryTimeline({
-      placedAt: order.placed_at,
+      placedAt: order.placedAt,
       etaMins,
     }),
   };

@@ -16,18 +16,18 @@ export const calculatePriceBreakdown = ({
     itemTotal + packagingFee + platformFee + deliveryFee + tax - discount;
 
   return {
-    item_total: itemTotal,
-    packaging_fee: packagingFee,
-    platform_fee: platformFee,
-    delivery_fee: deliveryFee,
+    itemTotal,
+    packagingFee,
+    platformFee,
+    deliveryFee,
     discount,
     tax,
-    final_total: Math.max(finalTotal, 0),
+    finalTotal: Math.max(finalTotal, 0),
   };
 };
 
 export const applyCompensation = (pricing = {}, compensationAmount = 0) => ({
   ...pricing,
-  compensation_amount: compensationAmount,
-  final_total: Math.max((pricing.final_total ?? 0) - compensationAmount, 0),
+  compensationAmount,
+  finalTotal: Math.max((pricing.finalTotal ?? 0) - compensationAmount, 0),
 });

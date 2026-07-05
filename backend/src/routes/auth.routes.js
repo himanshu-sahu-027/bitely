@@ -1,7 +1,5 @@
 import express from "express";
 import {
-  sendOTP,
-  verifyOTPAndLogin,
   register,
   verifyEmail,
   login,
@@ -16,10 +14,7 @@ import { roleAuthorize } from "../middlewares/roleAuthorize.middleware.js";
 
 const router = express.Router();
 
-router.post("/send-otp", sendOTP);
-router.post("/verify-otp", verifyOTPAndLogin);
-
-// Production-style auth (Phase 3/4/5/6)
+// Production-style auth
 router.post("/register", register);
 router.post("/verify-email", verifyEmail);
 router.post("/login", login);

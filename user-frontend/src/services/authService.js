@@ -1,5 +1,6 @@
 import api from "../api/axios";
 
+// send otp and verify otp are dead code ---> we have to remove them from here and use the backend service instead.
 export async function sendOtp(payload) {
   const response = await api.post("/api/auth/send-otp", payload);
   return response.data;

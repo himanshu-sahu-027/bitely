@@ -11,28 +11,30 @@ export const prepareReorder = async (orderId) => {
     throw error;
   }
 
-  const orderItems = await OrderItem.find({ order_id: orderId }).lean();
-  const menuIds = orderItems.map((item) => item.menu_id);
+  const orderItems = await OrderItem.find({ orderId: orderId }).lean();
+  const menuIds = orderItems.map((item) => item.menuId);
   const currentMenus = await Menu.find({ _id: { $in: menuIds } }).lean();
   const menuById = Object.fromEntries(
     currentMenus.map((menu) => [String(menu._id), menu])
   );
 
   return orderItems.map((item) => {
-    const currentMenu = menuById[String(item.menu_id)];
+    const currentMenu = menuById[String(item.menuId)];
 
     return {
-      order_item_id: item._id,
-      menu_id: item.menu_id,
-      previous_name: item.name,
-      previous_price: item.price,
+      orderItemId: item._id,
+      menuId: item.menuId,
+      previousName: item.name,
+      previousPrice: item.price,
       quantity: item.quantity,
       available: Boolean(currentMenu),
-      latest_name: currentMenu?.name ?? null,
-      latest_price: currentMenu?.price ?? null,
-      latest_image_url: currentMenu?.imageUrl ?? null,
+      latestName: currentMenu?.name ?? null,
+      latestPrice: currentMenu?.price ?? null,
+      latestImageUrl: currentMenu?.imageUrl ?? null,
       substitution: null,
-      disabled_reason: currentMenu ? null : "Menu item is no longer available",
+      disabledReason: currentMenu
+        ? null
+        : "Menu item is no longer available",
     };
   });
 };

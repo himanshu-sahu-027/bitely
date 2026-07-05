@@ -1,10 +1,10 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-import { clearOTP, generateOTP, storeOTP, verifyOTP } from "../services/otp.service.js";
-import { loginOrSignupUser, logoutUserSession } from "../services/auth.service.js";
+import { logoutUserSession } from "../services/auth.service.js";
+import { generateOTP } from "../services/otp.service.js";
 import { config } from "../config/env.js";
-import { deliverOtp } from "../services/deliverOtp.service.js";
+import { deliverEmailOtp } from "../services/deliverEmailOtp.service.js";
 import { validateSendOtp } from "../utils/validateAuth.js";
 import { createHttpError } from "../utils/createHttpError.js";
 import { sendResponse } from "../utils/sendResponse.js";
@@ -15,78 +15,6 @@ import User from "../models/user/user.model.js";
 import AuthSession from "../models/user/authSession.model.js";
 import EmailVerificationOtp from "../models/user/emailVerificationOtp.model.js";
 
-// 📲 SEND OTP (legacy endpoint: production-only email OTP)
-export const sendOTP = async (req, res, next) => {
-  try {
-    const { identifier, type } = req.body;
-
-    validateSendOtp({ identifier, type });
-
-    if (type !== "email") {
-      throw createHttpError("Unsupported type", 400);
-    }
-
-    const otp = generateOTP();
-
-    await storeOTP(identifier, type, otp);
-
-    try {
-      await deliverOtp({ identifier, type, otp });
-    } catch (error) {
-      await clearOTP(identifier, type);
-      throw error;
-    }
-
-    sendResponse(res, {
-      message: "OTP sent successfully",
-      data: null,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-//  VERIFY OTP + LOGIN/SIGNUP (legacy endpoint: production-only email OTP)
-export const verifyOTPAndLogin = async (req, res, next) => {
-  try {
-    const { identifier, type, otp, full_name } = req.body;
-
-    if (!identifier || !type || !otp) {
-      throw createHttpError("All fields are required", 400);
-    }
-
-    validateSendOtp({ identifier, type });
-
-    if (type !== "email") {
-      throw createHttpError("Unsupported type", 400);
-    }
-
-    const isValid = await verifyOTP(identifier, type, otp);
-
-    if (!isValid) {
-      throw createHttpError("Invalid OTP", 400);
-    }
-
-    const { token, user } = await loginOrSignupUser({
-      identifier,
-      type,
-      full_name,
-    });
-
-    sendResponse(res, {
-      message: "Login successful",
-      data: {
-        token,
-        user,
-      },
-    });
-
-  } catch (err) {
-    next(err);
-  }
-};
-
-// =======================
 // Register
 // =======================
 export const register = async (req, res, next) => {
@@ -140,7 +68,7 @@ export const register = async (req, res, next) => {
     );
 
     // Reuse existing OTP email delivery content/SMTP setup
-    await deliverOtp({ identifier: user.email, type: "email", otp });
+    await deliverEmailOtp({ identifier: user.email, otp });
 
     sendResponse(res, {
       message: "Registration successful. Please verify your email.",
@@ -411,7 +339,7 @@ export const forgotPassword = async (req, res, next) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    await deliverOtp({ identifier: normalizedEmail, type: "email", otp });
+    await deliverEmailOtp({ identifier: normalizedEmail, otp });
 
     sendResponse(res, {
       message: "Password reset OTP sent successfully",

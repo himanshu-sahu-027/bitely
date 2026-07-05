@@ -222,7 +222,7 @@ export const searchFoodsAndKitchens = async (req, res, next) => {
     // Kitchens search (for KitchenCard)
     const kitchens = await Kitchen.find({
       name: {
-        $regex: query,
+        $regex: escapedQuery,
         $options: "i",
       },
     })
@@ -243,33 +243,89 @@ export const searchFoodsAndKitchens = async (req, res, next) => {
     // Foods search should be powered by Menu items so we have:
     // price, rating, imageUrl + associated kitchen + food name
     // (Food model itself doesn't store these).
-    const menuItems = await Menu.find({
-      name: { $regex: query, $options: "i" },
-    })
-      .populate(
-        "kitchen_id",
-        "name rating delivery_time imageUrl address last_order_time"
-      )
-      .populate("food_id", "name slug")
-      .limit(10)
-      .lean();
+    //
+    // Search must match BOTH:
+    // - Menu.name
+    // - referenced Food.name
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    const foodsPayload = menuItems
-      .filter((m) => m.kitchen_id && m.food_id)
-      .map((m) => ({
-        id: String(m.food_id._id),
-        name: m.food_id.name,
-        slug: m.food_id.slug,
-        image: m.imageUrl || "",
-        price: m.price ?? 0,
-        rating: m.rating ?? 0,
-        kitchen: {
-          id: String(m.kitchen_id._id),
-          name: m.kitchen_id.name,
-          deliveryTime:
-            m.kitchen_id.delivery_time || m.kitchen_id.deliveryTime || "",
+    const menuNameRegex = { $regex: escapedQuery, $options: "i" };
+    const foodNameRegex = { $regex: escapedQuery, $options: "i" };
+
+    const menuItems = await Menu.aggregate([
+      {
+        $lookup: {
+          from: "foods",
+          localField: "food_id",
+          foreignField: "_id",
+          as: "food_id",
         },
-      }));
+      },
+      { $unwind: "$food_id" },
+      {
+        $lookup: {
+          from: "kitchens",
+          localField: "kitchen_id",
+          foreignField: "_id",
+          as: "kitchen_id",
+        },
+      },
+      { $unwind: "$kitchen_id" },
+      {
+        $match: {
+          $or: [
+            { name: menuNameRegex },
+            { "food_id.name": foodNameRegex },
+          ],
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          price: 1,
+          rating: 1,
+          imageUrl: 1,
+          kitchen_id: {
+            _id: "$kitchen_id._id",
+            name: "$kitchen_id.name",
+            rating: "$kitchen_id.rating",
+            delivery_time: "$kitchen_id.delivery_time",
+            imageUrl: "$kitchen_id.imageUrl",
+            address: "$kitchen_id.address",
+            last_order_time: "$kitchen_id.last_order_time",
+          },
+          food_id: {
+            _id: "$food_id._id",
+            name: "$food_id.name",
+            slug: "$food_id.slug",
+          },
+        },
+      },
+      // Deduplicate by menu._id (in case of unexpected join duplication)
+      {
+        $group: {
+          _id: "$_id",
+          doc: { $first: "$$ROOT" },
+        },
+      },
+      { $replaceRoot: { newRoot: "$doc" } },
+      { $limit: 10 },
+    ]);
+
+    const foodsPayload = menuItems.map((m) => ({
+      id: String(m.food_id._id),
+      name: m.food_id.name,
+      slug: m.food_id.slug,
+      image: m.imageUrl || "",
+      price: m.price ?? 0,
+      rating: m.rating ?? 0,
+      kitchen: {
+        id: String(m.kitchen_id._id),
+        name: m.kitchen_id.name,
+        deliveryTime:
+          m.kitchen_id.delivery_time || m.kitchen_id.deliveryTime || "",
+      },
+    }));
 
     sendResponse(res, {
       message: "Search results fetched successfully",

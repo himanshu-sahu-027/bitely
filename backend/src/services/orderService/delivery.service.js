@@ -8,23 +8,23 @@ export const calculateEtaMinutes = (deliveryTime) => {
 export const estimateDeliveryTimeline = ({ placedAt, etaMins }) => {
   if (!placedAt || etaMins === null) {
     return {
-      estimated_delivery_at: null,
-      eta_mins: etaMins,
+      estimatedDeliveryAt: null,
+      etaMins: etaMins,
     };
   }
 
   const placedDate = new Date(placedAt);
 
   return {
-    estimated_delivery_at: new Date(
+    estimatedDeliveryAt: new Date(
       placedDate.getTime() + etaMins * 60 * 1000
     ),
-    eta_mins: etaMins,
+    etaMins: etaMins,
   };
 };
 
 export const buildDeliveryTrackingHooks = (order) => ({
-  order_id: order?._id ?? order?.id ?? null,
+  orderId: order?._id ?? order?.id ?? null,
   status: order?.status ?? null,
-  can_track: order?.status === "out_for_delivery",
+  canTrack: order?.status === "out_for_delivery",
 });

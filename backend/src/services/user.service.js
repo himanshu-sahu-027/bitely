@@ -2,7 +2,8 @@ import User from "../models/user/user.model.js";
 import UserAddress from "../models/user/address.model.js";
 import { createHttpError } from "../utils/createHttpError.js";
 
-export const updateUserProfile = async ({ userId, name, email }) => {
+export const updateUserProfile = async ({ userId, name }) => {
+
   const user = await User.findById(userId);
 
   if (!user) {
@@ -13,18 +14,7 @@ export const updateUserProfile = async ({ userId, name, email }) => {
     user.name = name;
   }
 
-  if (email) {
-    const existing = await User.findOne({ email });
 
-    if (existing && existing._id.toString() !== user._id.toString()) {
-      throw createHttpError("Email already in use", 400);
-    }
-
-    user.email = email;
-    // Require re-verification after email change
-    user.isVerified = false;
-    user.authProvider = user.authProvider || "email";
-  }
 
   await user.save();
 
@@ -61,10 +51,11 @@ export const editUserAddress = async ({ userId, addressId, updateData }) => {
   }
 
   if (address.user_id.toString() !== userId.toString()) {
-    throw createHttpError("Unauthorized", 401);
+    throw createHttpError("Forbidden", 403);
   }
 
   if (updateData.is_default) {
+
     await UserAddress.updateMany({ user_id: userId }, { is_default: false });
   }
 
@@ -82,7 +73,24 @@ export const editUserAddress = async ({ userId, addressId, updateData }) => {
     }
   }
 
-  Object.assign(address, updateData);
+  // Whitelist editable fields only
+  const editableFields = [
+    "label",
+    "address_line",
+    "city",
+    "state",
+    "pincode",
+    "latitude",
+    "longitude",
+    "is_default",
+  ];
+
+  for (const key of editableFields) {
+    if (updateData[key] !== undefined) {
+      address[key] = updateData[key];
+    }
+  }
+
   await address.save();
 
   return address;
@@ -96,10 +104,11 @@ export const removeUserAddress = async ({ userId, addressId }) => {
   }
 
   if (address.user_id.toString() !== userId.toString()) {
-    throw createHttpError("Unauthorized", 401);
+    throw createHttpError("Forbidden", 403);
   }
 
   const wasDefault = address.is_default;
+
 
   await address.deleteOne();
 

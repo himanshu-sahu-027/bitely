@@ -14,8 +14,8 @@ import { sendResponse } from "../utils/sendResponse.js";
 
 const buildActor = (req) => ({
   role: req.user?.role || "user",
-  user_id: req.user?._id,
-  kitchen_id: req.query.kitchenId || req.body?.kitchen_id || null,
+  userId: req.user?._id,
+  kitchenId: req.query.kitchenId || req.body?.kitchenId || null,
 });
 
 // GET /api/orders
@@ -126,7 +126,7 @@ export const createNewOrder = async (req, res, next) => {
   try {
     const createOrderData = await prepareCreateOrderData({
       userId: req.user._id,
-      ...req.body,
+      ...req.validatedBody,
     });
 
     const result = await createOrder(createOrderData);

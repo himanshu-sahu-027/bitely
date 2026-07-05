@@ -1,4 +1,4 @@
-import { createHttpError } from "../utils/createHttpError.js";
+
 import { sendResponse } from "../utils/sendResponse.js";
 import {
   createUserAddress,
@@ -23,13 +23,13 @@ export const getMe = async (req, res, next) => {
 // UPDATE PROFILE
 export const updateProfile = async (req, res, next) => {
   try {
-    const { name, email } = req.body;
+    const { name } = req.validatedBody;
 
     const user = await updateUserProfile({
       userId: req.user._id,
       name,
-      email,
     });
+
 
     sendResponse(res, {
       message: "Profile updated successfully",
@@ -42,34 +42,13 @@ export const updateProfile = async (req, res, next) => {
 
 export const addAddress = async (req, res, next) => {
   try {
-    const {
-      label,
-      address_line,
-      city,
-      state,
-      pincode,
-      latitude,
-      longitude,
-      is_default,
-    } = req.body;
-
-    if (!address_line || !city || !pincode) {
-      throw createHttpError("Required fields missing", 400);
-    }
+    const addressData = req.validatedBody;
 
     const address = await createUserAddress({
       userId: req.user._id,
-      addressData: {
-      label,
-      address_line,
-      city,
-      state,
-      pincode,
-      latitude,
-      longitude,
-      is_default,
-      },
+      addressData,
     });
+
 
     sendResponse(res, {
       message: "Address added successfully",
@@ -100,8 +79,9 @@ export const updateAddress = async (req, res, next) => {
     const address = await editUserAddress({
       userId: req.user._id,
       addressId: id,
-      updateData: { ...req.body },
+      updateData: req.validatedBody,
     });
+
 
     sendResponse(res, {
       message: "Address updated successfully",

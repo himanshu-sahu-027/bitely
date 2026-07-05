@@ -26,8 +26,8 @@ export const addCartItem = async (req, res, next) => {
   try {
     const cart = await addItemToCart({
       userId: req.user._id,
-      menuId: req.body.menu_id,
-      quantity: req.body.quantity ?? 1,
+      menuId: req.validatedBody.menu_id,
+      quantity: req.validatedBody.quantity ?? 1,
     });
 
     sendResponse(res, {
@@ -44,7 +44,7 @@ export const updateCartItem = async (req, res, next) => {
     const cart = await updateCartItemQuantity({
       userId: req.user._id,
       menuId: req.params.menuId,
-      quantity: req.body.quantity,
+      quantity: req.validatedBody.quantity,
     });
 
     sendResponse(res, {
@@ -76,7 +76,7 @@ export const applyCouponToCart = async (req, res, next) => {
   try {
     const cart = await applyCartCoupon({
       userId: req.user._id,
-      code: req.body.code,
+      code: req.validatedBody.code,
     });
 
     sendResponse(res, {

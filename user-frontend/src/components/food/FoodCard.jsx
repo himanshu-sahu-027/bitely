@@ -1,11 +1,14 @@
 {/* Single food item card  */}
 
+import { useState } from "react";
 import { FaStar, FaPlus, FaMinus } from "react-icons/fa"
 import { useCart } from "../../context/CartContext"
 import dummyFoodImg from "../../assets/images/dummy_food_img.png"
+import FoodReviewList from "../review/FoodReviewList"
 
 function FoodCard({
   id,
+  menuId,
   name,
   image,
   price,
@@ -13,6 +16,7 @@ function FoodCard({
   kitchen,
 }) {
   const { cart, addToCart, removeFromCart } = useCart()
+  const [showReviews, setShowReviews] = useState(false);
 
   // Find this food item inside the shared cart.
   const cartItem = cart.items.find((item) => item.id === id)
@@ -70,6 +74,18 @@ function FoodCard({
         <p className="text-sm text-gray-500">{kitchen?.name}</p>
 
         <p className="text-xs text-gray-400">{kitchen?.deliveryTime} delivery</p>
+
+        {menuId ? (
+          <button
+            type="button"
+            onClick={() => setShowReviews((v) => !v)}
+            className="mt-2 w-full border px-3 py-1.5 rounded text-sm hover:bg-gray-50"
+          >
+            {showReviews ? "Hide Reviews" : "View Reviews"}
+          </button>
+        ) : null}
+
+        {menuId && showReviews ? <FoodReviewList menuId={menuId} /> : null}
 
         <div className="flex justify-between items-center mt-3">
 

@@ -1,25 +1,25 @@
 import { useEffect, useState } from "react";
 
-import { getKitchenReviews } from "../../services/reviewService";
+import { getFoodReviews } from "../../services/reviewService";
 
-function ReviewList({ kitchenId }) {
+function FoodReviewList({ menuId }) {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!kitchenId) return;
+    if (!menuId) return;
 
     const loadReviews = async () => {
       setLoading(true);
       setError("");
 
       try {
-        const response = await getKitchenReviews(kitchenId);
-
+        const response = await getFoodReviews(menuId);
         setReviews(response.data || []);
-      } catch {
-        setError("Failed to load customer reviews.");
+      } catch (e) {
+        console.error(e);
+        setError("Failed to load food reviews.");
         setReviews([]);
       } finally {
         setLoading(false);
@@ -27,26 +27,26 @@ function ReviewList({ kitchenId }) {
     };
 
     loadReviews();
-  }, [kitchenId]);
+  }, [menuId]);
 
-  if (!kitchenId) return null;
+  if (!menuId) return null;
 
   return (
-    <section className="mt-8">
-      <h2 className="mb-4 text-xl font-bold">Customer Reviews</h2>
+    <section className="mt-4">
+      <h2 className="mb-3 text-lg font-bold">Food Reviews</h2>
 
       {loading && <p className="text-sm">Loading reviews...</p>}
 
       {!loading && error && <p className="text-sm text-red-600">{error}</p>}
 
       {!loading && !error && reviews.length === 0 && (
-        <p>No reviews yet.</p>
+        <p className="text-sm">No reviews yet.</p>
       )}
 
       {!loading &&
         !error &&
         reviews.map((review) => (
-          <div key={review._id} className="mb-4 rounded-lg border p-4">
+          <div key={review._id} className="mb-3 rounded-lg border p-3">
             <div className="flex items-center gap-3">
               <div className="font-semibold">{review.user_id?.name}</div>
 
@@ -64,4 +64,4 @@ function ReviewList({ kitchenId }) {
   );
 }
 
-export default ReviewList;
+export default FoodReviewList;

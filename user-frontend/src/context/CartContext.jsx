@@ -78,6 +78,7 @@ export function CartProvider({ children }) {
   const { isAuthenticated } = useAuth();
   const [cart, setCart] = useState(() => withGuestPricing(readGuestCart()));
   const [isCartLoading, setIsCartLoading] = useState(false);
+  const [cartError, setCartError] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined" || isAuthenticated) {
@@ -97,6 +98,7 @@ export function CartProvider({ children }) {
       }
 
       setIsCartLoading(true);
+      setCartError("");
 
       try {
         const response = await fetchCart();
@@ -107,6 +109,7 @@ export function CartProvider({ children }) {
       } catch {
         if (!ignore) {
           setCart(EMPTY_CART);
+          setCartError("Failed to load your cart. Please try again.");
         }
       } finally {
         if (!ignore) {
@@ -128,11 +131,15 @@ export function CartProvider({ children }) {
 
   const syncServerCart = async (request) => {
     setIsCartLoading(true);
+    setCartError("");
 
     try {
       const response = await request();
       setCart(response.data);
       return response.data;
+    } catch {
+      setCartError("Could not update your cart. Please try again.");
+      return null;
     } finally {
       setIsCartLoading(false);
     }
@@ -332,6 +339,7 @@ export function CartProvider({ children }) {
       value={{
         cart,
         isCartLoading,
+        cartError,
         addToCart,
         removeFromCart,
         updateQuantity,

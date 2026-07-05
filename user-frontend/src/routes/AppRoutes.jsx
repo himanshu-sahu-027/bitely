@@ -75,8 +75,22 @@ function AppContent() {
         <Route path="/search" element={<SearchResultsPage />} />
         <Route path="/about" element={<About />} />
         <Route path="/food/:slug" element={<KitchensByFoodPage />} />
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/checkout" element={<Checkout />} />
+        <Route
+          path="/cart"
+          element={
+            <ProtectedRoute>
+              <Cart />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/checkout"
+          element={
+            <ProtectedRoute>
+              <Checkout />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/orders"
           element={

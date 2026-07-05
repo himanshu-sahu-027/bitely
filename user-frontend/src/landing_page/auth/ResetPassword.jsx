@@ -44,7 +44,8 @@ function ResetPassword() {
       await resetPassword({
         email: email.trim().toLowerCase(),
         otp: otp.trim(),
-        password,
+        newPassword: password,
+        confirmNewPassword: confirmPassword,
       });
 
       navigate("/login", {

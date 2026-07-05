@@ -40,8 +40,8 @@ const kitchenReviewSchema = new mongoose.Schema(
 
 kitchenReviewSchema.index(
   {
+    order_id: 1,
     kitchen_id: 1,
-    user_id: 1,
   },
   {
     unique: true,

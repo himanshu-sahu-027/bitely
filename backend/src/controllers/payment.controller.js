@@ -6,8 +6,12 @@ import { Order } from "../models/orderCatalog/index.js";
 import { createHttpError } from "../utils/createHttpError.js";
 import { getRazorpayInstance, isRazorpayConfigured } from "../utils/razorpay.js";
 import { sendResponse } from "../utils/sendResponse.js";
-
-const ALLOWED_PAYMENT_METHODS = ["COD", "ONLINE"];
+import Menu from "../models/kitchenCatalog/menu.model.js";
+import {
+  createPayment,
+  markPaymentPaid,
+  markPaymentFailed,
+} from "../services/orderService/payment.service.js";
 
 const normalizeItems = (items = []) =>
   items.map((item) => ({
@@ -22,54 +26,41 @@ const buildFallbackKitchen = (items = []) => {
   const firstItem = items[0] || {};
 
   return {
-    kitchen_id:
+    kitchenId:
       firstItem.kitchenId ||
       firstItem.kitchen_id ||
       new mongoose.Types.ObjectId(),
-    kitchen_name: firstItem.kitchenName || firstItem.kitchen_name || "Bitely Kitchen",
-    kitchen_image_url: firstItem.kitchenImage || firstItem.kitchen_image_url || "",
+    kitchenName:
+      firstItem.kitchenName || firstItem.kitchen_name || "Bitely Kitchen",
+    kitchenImageUrl:
+      firstItem.kitchenImage ||
+      firstItem.kitchen_image_url ||
+      "",
   };
 };
 
-const validateCreateOrderPayload = ({ items, totalAmount, paymentMethod, deliveryAddress }) => {
-  if (!Array.isArray(items) || items.length === 0) {
-    throw createHttpError("At least one order item is required", 400);
-  }
-
-  if (!Number.isFinite(Number(totalAmount)) || Number(totalAmount) <= 0) {
-    throw createHttpError("A valid total amount is required", 400);
-  }
-
-  if (!ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
-    throw createHttpError("Payment method must be COD or ONLINE", 400);
-  }
-
-  if (!deliveryAddress?.addressLine || !deliveryAddress?.city || !deliveryAddress?.pincode) {
-    throw createHttpError("Delivery address is incomplete", 400);
-  }
-};
-
-const buildOrderDocument = ({ req, normalizedItems }) => {
-  const userId = req.user?._id || req.body.user || null;
-  const paymentMethod = req.body.paymentMethod;
-  const totalAmount = Number(req.body.totalAmount);
+const buildOrderDocument = ({
+  req,
+  normalizedItems,
+  totalAmount,
+  paymentMethod,
+  deliveryAddress,
+  instructions,
+}) => {
+  const userId = req.user._id;
   const fallbackKitchen = buildFallbackKitchen(normalizedItems);
 
   return {
     user: userId,
-    user_id: userId,
+    userId: userId,
     items: normalizedItems,
     totalAmount,
-    total_amount: totalAmount,
     paymentMethod,
-    payment_method: paymentMethod,
-    paymentStatus: paymentMethod === "COD" ? "pending" : "pending",
-    payment_status: paymentMethod === "COD" ? "pending" : "pending",
-    deliveryAddress: req.body.deliveryAddress,
+    paymentStatus: "pending",
+    deliveryAddress,
     orderStatus: "placed",
-    status: "placed",
-    placed_at: new Date(),
-    instructions: req.body.instructions || "",
+    placedAt: new Date(),
+    instructions: instructions || "",
     ...fallbackKitchen,
   };
 };
@@ -88,9 +79,6 @@ const createGatewayOrder = async ({ amount, receipt }) => {
     amount,
     currency: "INR",
     receipt,
-    notes: {
-      platform: "bitely-test-mode",
-    },
   });
 };
 
@@ -102,12 +90,74 @@ const buildSignature = ({ razorpayOrderId, razorpayPaymentId, secret }) =>
 
 export const createPaymentOrder = async (req, res, next) => {
   try {
-    validateCreateOrderPayload(req.body);
+    const payload = req.validatedBody;
 
-    const normalizedItems = normalizeItems(req.body.items);
-    const order = await Order.create(buildOrderDocument({ req, normalizedItems }));
+    // Recompute pricing on the server to prevent tampering with totalAmount and item prices.
+    const normalizedClientItems = normalizeItems(payload.items);
 
-    if (req.body.paymentMethod === "COD") {
+    // Required: if any menuId is missing, return 404.
+    const hasMissingMenuId = normalizedClientItems.some(
+      (item) => !item.menuId || !String(item.menuId)
+    );
+
+    if (hasMissingMenuId) {
+      throw createHttpError("Menu not found", 404);
+    }
+
+    const menuIds = normalizedClientItems.map((item) => item.menuId);
+
+    if (menuIds.length === 0) {
+      throw createHttpError("At least one order item is required", 400);
+    }
+
+    const menus = await Menu.find({
+      _id: { $in: menuIds },
+    })
+      .select("_id price kitchen_id")
+      .lean();
+
+    // Required: if any menuId is not found in DB, return 404.
+    if (!menus || menus.length !== new Set(menuIds.map(String)).size) {
+      throw createHttpError("Menu not found", 404);
+    }
+
+    const menuPriceMap = new Map(menus.map((m) => [String(m._id), m.price]));
+
+    for (const [id, price] of menuPriceMap.entries()) {
+      if (!Number.isFinite(Number(price)) || Number(price) < 0) {
+        throw createHttpError("Invalid menu price", 400);
+      }
+    }
+
+    const normalizedItems = normalizedClientItems.map((item) => {
+      const idKey = String(item.menuId);
+
+      if (!menuPriceMap.has(idKey)) {
+        throw createHttpError("Menu not found", 404);
+      }
+
+      const serverPrice = menuPriceMap.get(idKey);
+
+      return { ...item, price: Number(serverPrice) };
+    });
+
+    const serverTotalAmount = normalizedItems.reduce(
+      (sum, item) => sum + Number(item.quantity) * Number(item.price),
+      0
+    );
+
+    const order = await Order.create(
+      buildOrderDocument({
+        req,
+        normalizedItems,
+        totalAmount: serverTotalAmount,
+        paymentMethod: payload.paymentMethod,
+        deliveryAddress: payload.deliveryAddress,
+        instructions: payload.instructions || "",
+      })
+    );
+
+    if (payload.paymentMethod === "COD") {
       return sendResponse(res, {
         statusCode: 201,
         message: "COD order created successfully",
@@ -119,7 +169,7 @@ export const createPaymentOrder = async (req, res, next) => {
       });
     }
 
-    const amountInPaise = Math.round(Number(req.body.totalAmount) * 100);
+    const amountInPaise = Math.round(Number(serverTotalAmount) * 100);
     const receipt = `bitely_${order._id}_${Date.now()}`;
     const razorpayOrder = await createGatewayOrder({
       amount: amountInPaise,
@@ -129,14 +179,28 @@ export const createPaymentOrder = async (req, res, next) => {
     order.razorpayOrderId = razorpayOrder.id;
     await order.save();
 
+    await createPayment({
+      orderId: order._id,
+      userId: order.userId,
+      kitchenId: order.kitchenId,
+      gateway: "razorpay",
+      gatewayOrderId: razorpayOrder.id,
+      transactionId: null,
+      gatewaySignature: null,
+      amount: order.totalAmount,
+      method: order.paymentMethod,
+      currency: "INR",
+      status: "pending",
+      paidAt: null,
+    });
+
     return sendResponse(res, {
       statusCode: 201,
-      message: "Razorpay test order created successfully",
+      message: "Razorpay order created successfully",
       data: {
         order,
         razorpayOrder,
         keyId: config.RAZORPAY_KEY_ID,
-        mode: "RAZORPAY_TEST",
       },
     });
   } catch (error) {
@@ -151,7 +215,7 @@ export const verifyPayment = async (req, res, next) => {
       razorpayOrderId,
       razorpayPaymentId,
       razorpaySignature,
-    } = req.body;
+    } = req.validatedBody;
 
     if (!orderId || !razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
       throw createHttpError("Payment verification payload is incomplete", 400);
@@ -161,6 +225,49 @@ export const verifyPayment = async (req, res, next) => {
 
     if (!order) {
       throw createHttpError("Order not found", 404);
+    }
+
+    // Idempotency: if payment already verified as paid, do not overwrite payment details.
+    if (order.paymentStatus === "paid") {
+      return sendResponse(res, {
+        success: true,
+        statusCode: 200,
+        message: "Payment already verified",
+        data: {
+          order,
+          alreadyProcessed: true,
+        },
+      });
+    }
+
+    // Authorization: only allow verifying payment for the appropriate order owner.
+    // - Admin: allow
+    // - Normal user: only own orders
+    // - Vendor: allow only if order belongs to vendor's kitchen (if kitchen_id is present)
+    //   Otherwise deny (prevents cross-kitchen/payment verification).
+    const actor = {
+      role: req.user?.role,
+      userId: req.user?._id,
+      kitchenId: req.user?.kitchenId || req.user?.kitchen_id || null,
+    };
+
+    if (actor.role === "user") {
+      if (!String(order.userId) || String(order.userId) !== String(actor.userId)) {
+        throw createHttpError("Unauthorized", 403);
+      }
+    } else if (actor.role === "vendor") {
+      if (!actor.kitchenId) {
+        throw createHttpError("Unauthorized", 403);
+      }
+      // order.kitchenId may be an ObjectId or populated doc id; normalize as string.
+      if (!String(order.kitchenId) || String(order.kitchenId) !== String(actor.kitchenId)) {
+        throw createHttpError("Unauthorized", 403);
+      }
+    } else if (actor.role === "admin") {
+      // allow
+    } else {
+      // deny any unknown role
+      throw createHttpError("Forbidden", 403);
     }
 
     if (!isRazorpayConfigured()) {
@@ -180,15 +287,28 @@ export const verifyPayment = async (req, res, next) => {
       secret: verificationSecret,
     });
 
-    const isSignatureValid = expectedSignature === razorpaySignature;
+    const expectedSigBuf = Buffer.from(expectedSignature, "utf8");
+    const providedSigBuf = Buffer.from(razorpaySignature, "utf8");
+
+    const isSignatureValid =
+      expectedSigBuf.length === providedSigBuf.length &&
+      crypto.timingSafeEqual(expectedSigBuf, providedSigBuf);
 
     order.razorpayOrderId = razorpayOrderId;
     order.razorpayPaymentId = razorpayPaymentId;
     order.razorpaySignature = razorpaySignature;
     order.paymentStatus = isSignatureValid ? "paid" : "failed";
-    order.payment_status = order.paymentStatus;
 
     await order.save();
+
+    if (isSignatureValid) {
+      await markPaymentPaid(orderId, {
+        transactionId: razorpayPaymentId,
+        gatewaySignature: razorpaySignature,
+      });
+    } else {
+      await markPaymentFailed(orderId, "Payment signature verification failed");
+    }
 
     if (!isSignatureValid) {
       throw createHttpError("Payment signature verification failed", 400);

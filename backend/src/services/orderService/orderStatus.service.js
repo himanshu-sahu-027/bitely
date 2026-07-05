@@ -27,10 +27,10 @@ export const buildStatusHistoryEntry = ({
   message,
   createdAt = new Date(),
 }) => ({
-  order_id: orderId,
+  orderId,
   status,
   message,
-  created_at: createdAt,
+  createdAt,
 });
 
 export const checkCancellationEligibility = ({
@@ -53,21 +53,22 @@ export const checkCancellationEligibility = ({
     };
   }
 
-  const cancellationDeadline = order.last_cancellation_time
-    ? new Date(order.last_cancellation_time)
+  const cancellationDeadline = order.lastCancellationTime
+    ? new Date(order.lastCancellationTime)
     : null;
 
   if (cancellationDeadline && now > cancellationDeadline) {
     return {
       canCancel: false,
       reason: "Cancellation window has expired",
-      refundRule: order.payment_status === "paid" ? "manual_review" : "none",
+      refundRule: order.paymentStatus === "paid" ? "manual_review" : "none",
     };
   }
 
   return {
     canCancel: true,
     reason: null,
-    refundRule: order.payment_status === "paid" ? "full_refund" : "none",
+    refundRule:
+      order.paymentStatus === "paid" ? "full_refund" : "none",
   };
 };

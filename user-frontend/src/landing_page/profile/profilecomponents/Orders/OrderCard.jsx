@@ -18,6 +18,10 @@ import {
 function OrderCard({ order, onReorder, onCancel, onPay }) {
   const { user } = useAuth();
 
+  const showError = (message) => {
+    window.alert(message);
+  };
+
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState(null); // { type, kitchenId/menuId, orderId }
@@ -99,8 +103,8 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
       );
 
       setMyFoodReviewsByMenuId(nextFood);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      showError("Failed to load your kitchen/food reviews. Please try again.");
     } finally {
       setReviewsLoading(false);
     }
@@ -209,8 +213,11 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
           });
         }
       }
+
+      // Ensure the currently displayed review UI updates immediately.
+      await refreshKitchenAndFoodReviews();
     } catch (error) {
-      console.error(error);
+      showError(error?.message || "Failed to save your review. Please try again.");
       throw error;
     }
   };
@@ -226,8 +233,13 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
       if (reviewTarget.type === "food") {
         await deleteFoodReview(reviewTarget.reviewId);
       }
+
+      // Ensure the currently displayed review UI updates immediately.
+      await refreshKitchenAndFoodReviews();
     } catch (error) {
-      console.error(error);
+      showError(
+        error?.message || "Failed to delete your review. Please try again.",
+      );
       throw error;
     }
   };
@@ -343,22 +355,24 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
 
                         <button
                           type="button"
-                          onClick={async () => {
-                            if (!menuId) return;
+                        onClick={async () => {
+                          if (!menuId) return;
 
-                            try {
-                              setFoodReviewsLoading(true);
-                              const resp = await getFoodReviews(menuId);
-                              const list = resp?.data ?? resp ?? [];
-                              setFoodReviewsList(list);
-                              setFoodReviewsMenuId(menuId);
-                              setFoodReviewsOpen(true);
-                            } catch (e) {
-                              console.error(e);
-                            } finally {
-                              setFoodReviewsLoading(false);
-                            }
-                          }}
+                          try {
+                            setFoodReviewsLoading(true);
+                            const resp = await getFoodReviews(menuId);
+                            const list = resp?.data ?? resp ?? [];
+                            setFoodReviewsList(list);
+                            setFoodReviewsMenuId(menuId);
+                            setFoodReviewsOpen(true);
+                          } catch {
+                            showError(
+                              "Failed to load food reviews. Please try again.",
+                            );
+                          } finally {
+                            setFoodReviewsLoading(false);
+                          }
+                        }}
                           className="text-xs text-slate-600 underline underline-offset-2"
                         >
                           View Reviews
@@ -464,8 +478,10 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
                             setFoodReviewsList(list);
                             setFoodReviewsMenuId(menuId);
                             setFoodReviewsOpen(true);
-                          } catch (e) {
-                            console.error(e);
+                          } catch {
+                            showError(
+                              "Failed to load food reviews. Please try again.",
+                            );
                           } finally {
                             setFoodReviewsLoading(false);
                           }

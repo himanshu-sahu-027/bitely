@@ -30,20 +30,20 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-    user_id: {
+    userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
-    kitchen_id: {
+    kitchenId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Kitchen",
       required: true,
     },
 
     // Kitchen snapshot stored at order time.
-    kitchen_name: { type: String, trim: true, required: true },
-    kitchen_image_url: { type: String, trim: true },
+    kitchenName: { type: String, trim: true, required: true },
+    kitchenImageUrl: { type: String, trim: true },
 
     status: {
       type: String,
@@ -68,27 +68,17 @@ const orderSchema = new mongoose.Schema(
       default: "placed",
     },
 
-    placed_at: { type: Date, required: true },
-    delivered_at: { type: Date, default: null },
-    cancelled_at: { type: Date, default: null },
+    placedAt: { type: Date, required: true },
+    deliveredAt: { type: Date, default: null },
+    cancelledAt: { type: Date, default: null },
 
-    delivery_by_time: { type: Date },
-    last_cancellation_time: { type: Date },
+    deliveryByTime: { type: Date },
+    lastCancellationTime: { type: Date },
 
-    payment_method: {
-      type: String,
-      enum: ["UPI", "COD", "Card", "ONLINE"],
-      required: true,
-    },
     paymentMethod: {
       type: String,
       enum: ["COD", "ONLINE", "UPI", "Card"],
       required: true,
-    },
-    payment_status: {
-      type: String,
-      enum: ["pending", "paid", "failed", "refunded"],
-      default: "pending",
     },
     paymentStatus: {
       type: String,
@@ -96,7 +86,6 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
     },
 
-    total_amount: { type: Number, required: true, min: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     instructions: { type: String, trim: true },
     items: {
@@ -123,30 +112,11 @@ const orderSchema = new mongoose.Schema(
       default: null,
     },
   },
-  { timestamps: { createdAt: "created_at", updatedAt: true } }
+  { timestamps: { createdAt: "createdAt", updatedAt: "updatedAt" } }
 );
 
-orderSchema.pre("validate", function syncPaymentFields(next) {
-  this.user = this.user || this.user_id;
-  this.user_id = this.user_id || this.user;
-
-  this.paymentMethod = this.paymentMethod || this.payment_method;
-  this.payment_method = this.payment_method || this.paymentMethod;
-
-  this.paymentStatus = this.paymentStatus || this.payment_status;
-  this.payment_status = this.payment_status || this.paymentStatus;
-
-  this.totalAmount = this.totalAmount ?? this.total_amount;
-  this.total_amount = this.total_amount ?? this.totalAmount;
-
-  this.orderStatus = this.orderStatus || this.status;
-  this.status = this.status || this.orderStatus;
-
-  next();
-});
-
-orderSchema.index({ user_id: 1, created_at: -1 });
-orderSchema.index({ kitchen_id: 1, created_at: -1 });
+orderSchema.index({ userId: 1, createdAt: -1 });
+orderSchema.index({ kitchenId: 1, createdAt: -1 });
 orderSchema.index({ status: 1 });
 orderSchema.index({ razorpayOrderId: 1 }, { sparse: true });
 orderSchema.index({ razorpayPaymentId: 1 }, { sparse: true });
