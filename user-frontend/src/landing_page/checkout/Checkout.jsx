@@ -329,7 +329,9 @@ export default function Checkout() {
                       ].join(" ")}
                     >
                       <p className="font-semibold text-slate-900">{address.label}</p>
-                      <p className="mt-2 text-sm text-slate-600">{address.fullAddress}</p>
+                      <p className="mt-2 text-sm text-slate-600 break-words whitespace-normal break-all lg:break-normal">
+                        {address.fullAddress}
+                      </p>
                     </button>
                   );
                 })}

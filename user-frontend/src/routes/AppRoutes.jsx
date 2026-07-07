@@ -55,8 +55,17 @@ function AppContent() {
       return;
     }
 
-    setAccessNotice(location.state.authPrompt);
+    const notice = location.state.authPrompt;
+
+    const t = window.setTimeout(() => {
+      setAccessNotice(notice);
+    }, 0);
+
     navigate(location.pathname, { replace: true, state: null });
+
+    return () => {
+      window.clearTimeout(t);
+    };
   }, [location.pathname, location.state, navigate]);
 
   return (

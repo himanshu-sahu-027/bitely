@@ -1,6 +1,7 @@
 {/* Single food card in popular foods section */}
 
 import { useNavigate } from "react-router-dom";
+import PopularFoodItemImg from "../../../assets/images/PopularFoodItem.png";
 
 function PopularFoodItem({ food }) {
   const navigate = useNavigate();
@@ -9,7 +10,7 @@ function PopularFoodItem({ food }) {
     <div
       // Open the kitchens page for the selected food.
       onClick={() => navigate(`/food/${food.slug}`)}
-      className="flex flex-col items-center min-w-[140px] cursor-pointer group perspective hover:z-10 ml-10"
+      className="flex flex-col items-center flex-none cursor-pointer group perspective hover:z-10 px-2 w-1/2 sm:w-1/3 md:w-1/4 lg:w-[18%] xl:w-[15%]"
     >
       <div
         className="
@@ -18,13 +19,16 @@ function PopularFoodItem({ food }) {
         "
       >
         <img
-          src={food.image}
+          src={food.image || PopularFoodItemImg}
+          onError={(event) => {
+            event.currentTarget.src = PopularFoodItemImg;
+          }}
           alt={food.name}
-          className="w-80 h-24 object-contain drop-shadow-sm"
+          className="w-full max-w-[20rem] h-28 sm:h-32 md:h-36 object-contain drop-shadow-sm"
         />
       </div>
 
-      <p className="mt-3 text-base font-semibold text-gray-800 group-hover:text-indigo-600 transition-colors duration-300 ">
+      <p className="mt-3 text-base font-semibold text-gray-800 group-hover:text-indigo-600 transition-colors duration-300 text-center">
         {food.name}
       </p>
     </div>

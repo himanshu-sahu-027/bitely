@@ -2,6 +2,10 @@ import { motion } from "framer-motion";
 import mascot from "../../assets/logo/logo.png";
 import "./MascotAnimation.css";
 
+const MotionSpan = motion.span;
+const MotionDiv = motion.div;
+const MotionImg = motion.img;
+
 const vegetables = [
   {
     className: "veg veg1",
@@ -37,7 +41,7 @@ function MascotAnimation() {
   return (
     <div className="mascot-container">
       {vegetables.map(({ className, icon, animate, duration, delay }) => (
-        <motion.span
+        <MotionSpan
           key={className}
           className={className}
           animate={animate}
@@ -45,41 +49,41 @@ function MascotAnimation() {
             duration,
             delay,
             repeat: Infinity,
-            ease: "easeInOut"
+            ease: "easeInOut",
           }}
         >
           {icon}
-        </motion.span>
+        </MotionSpan>
       ))}
 
-      <motion.div
+      <MotionDiv
         className="mascot-stage"
         animate={{
           y: [0, -10, 0],
-          rotate: [0, -0.8, 0.8, 0]
+          rotate: [0, -0.8, 0.8, 0],
         }}
         transition={{
           duration: 7,
           repeat: Infinity,
-          ease: "easeInOut"
+          ease: "easeInOut",
         }}
       >
-        <motion.img
+        <MotionImg
           src={mascot}
           alt="Bitely Mascot"
           className="mascot"
           animate={{
             x: [0, -3, 3, 0],
-            rotate: [0, -0.8, 0.8, 0]
+            rotate: [0, -0.8, 0.8, 0],
           }}
           transition={{
             duration: 7,
             repeat: Infinity,
-            ease: "easeInOut"
+            ease: "easeInOut",
           }}
         />
         <div className="mascot-shadow" />
-      </motion.div>
+      </MotionDiv>
     </div>
   );
 }

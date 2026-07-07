@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import "./HowItWorks.css";
 import { FaSearch, FaUtensils, FaShoppingCart, FaSmile } from "react-icons/fa";
 
+const MotionDiv = motion.div;
+
 const steps = [
   {
     icon: <FaSearch />,
@@ -43,7 +45,7 @@ function HowItWorks() {
       <div className="steps-container py-5 hover:cursor-pointer"> 
 
         {steps.map((step, index) => (
-          <motion.div
+          <MotionDiv
             key={index}
             className="step-card"
             whileHover={{ y: -10 }}
@@ -54,7 +56,7 @@ function HowItWorks() {
               <h3 className="font-medium">{step.title}</h3>
             </div>
             <p className="pb-2">{step.description}</p>
-          </motion.div>
+          </MotionDiv>
         ))}
 
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { KitchenGrid } from "../../components/kitchen";
+import EmptyState from "../../components/layout/EmptyState";
 import { fetchRestaurants } from "../../services/restaurantService";
 import { defaultKitchenFilters } from "../../utils/filterKitchenGridItems";
 
@@ -62,7 +63,15 @@ function KitchenSection({ filters = defaultKitchenFilters }) {
         <p className="px-4 text-sm text-red-600">{error}</p>
       ) : null}
 
-      {!isLoading && !error ? <KitchenGrid kitchens={kitchens} /> : null}
+      {!isLoading && !error && kitchens.length > 0 ? (
+        <KitchenGrid kitchens={kitchens} />
+      ) : null}
+
+      {!isLoading && !error && kitchens.length === 0 ? (
+        <div className="px-4">
+          <EmptyState />
+        </div>
+      ) : null}
     </div>
   );
 }

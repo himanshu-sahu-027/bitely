@@ -38,7 +38,7 @@ function FoodCard({
 
   return (
 
-    <div className="bg-white hover:bg-blue-50 rounded-xl shadow-md overflow-hidden hover:shadow-[10px_10px_15px_-10px_rgba(65,105,225,0.8)] transition-all duration-300">
+    <div className="w-[270px] bg-white hover:bg-blue-50 rounded-xl shadow-md overflow-hidden hover:shadow-[10px_10px_15px_-10px_rgba(65,105,225,0.8)] transition-all duration-300">
 
       {/* Food Image */}
 

@@ -4,16 +4,18 @@ export default function EditProfileModal({ open, profile, onClose, onSave }) {
   const [name, setName] = useState(profile?.name ?? "");
   const [phone, setPhone] = useState(profile?.phone ?? "");
   const [email, setEmail] = useState(profile?.email ?? "");
+  const [isSaving, setIsSaving] = useState(false);
 
   if (!open) return null;
 
   return (
     <div
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4"
-      onClick={onClose}
+      onClick={isSaving ? undefined : onClose}
       role="dialog"
       aria-modal="true"
     >
+
       <div
         className="w-full max-w-xl rounded-2xl bg-white shadow-lg border border-slate-100 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -23,13 +25,14 @@ export default function EditProfileModal({ open, profile, onClose, onSave }) {
             <div className="text-lg font-bold text-slate-900">Edit Profile</div>
             <div className="text-sm text-slate-500 mt-1">Update your contact details.</div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
-          >
-            Close
-          </button>
+            <button
+              type="button"
+              onClick={isSaving ? undefined : onClose}
+              disabled={isSaving}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Close
+            </button>
         </div>
 
         <div className="p-5 md:p-6 space-y-4">
@@ -73,17 +76,23 @@ export default function EditProfileModal({ open, profile, onClose, onSave }) {
             </button>
             <button
               type="button"
-              onClick={() => {
-                onSave?.({
-                  ...(profile ?? {}),
-                  name: name.trim() || (profile?.name ?? ""),
-                  phone: phone.trim() || (profile?.phone ?? ""),
-                  email: email.trim() || (profile?.email ?? ""),
-                });
+              disabled={isSaving}
+              onClick={async () => {
+                setIsSaving(true);
+                try {
+                  await onSave?.({
+                    ...(profile ?? {}),
+                    name: name.trim() || (profile?.name ?? ""),
+                    phone: phone.trim() || (profile?.phone ?? ""),
+                    email: email.trim() || (profile?.email ?? ""),
+                  });
+                } finally {
+                  setIsSaving(false);
+                }
               }}
-              className="rounded-xl bg-gradient-to-r from-primary via-secondary to-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
+              className="rounded-xl bg-gradient-to-r from-primary via-secondary to-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Save Profile
+              {isSaving ? "Saving..." : "Save Profile"}
             </button>
           </div>
         </div>

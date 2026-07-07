@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
+
 
 export default function CartCouponBox({
   coupon,
@@ -7,18 +8,20 @@ export default function CartCouponBox({
   onRemove,
   formatINR,
 }) {
-  const [code, setCode] = useState(coupon?.code || "")
-
-  useEffect(() => {
-    setCode(coupon?.code || "")
-  }, [coupon?.code])
-
   const applied = Boolean(coupon?.applied)
+  const [code, setCode] = useState(coupon?.code || "")
+  const [isUpdating, setIsUpdating] = useState(false)
+
   const discount = Math.max(0, Number(coupon?.discount || 0))
   const error = String(coupon?.error || "")
 
+  // Remount input when coupon application state changes so local state
+  // stays consistent without synchronizing via useEffect.
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm md:p-5">
+    <div
+      className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm md:p-5"
+      key={applied ? "applied" : "idle"}
+    >
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-base font-semibold text-slate-900">Coupons</h3>
         {applied && (
@@ -46,26 +49,34 @@ export default function CartCouponBox({
         {!applied ? (
           <button
             type="button"
-            disabled={disabled}
-            onClick={() => onApply(code)}
+            disabled={disabled || isUpdating}
+            onClick={disabled || isUpdating ? undefined : () => {
+              setIsUpdating(true)
+              Promise.resolve(onApply?.(code)).finally(() => setIsUpdating(false))
+            }}
             className={[
               "h-11 shrink-0 rounded-2xl px-4 text-sm font-semibold shadow-sm transition active:scale-[0.99]",
-              disabled
+              disabled || isUpdating
                 ? "cursor-not-allowed bg-slate-200 text-slate-500"
                 : "bg-indigo-600 text-white hover:bg-indigo-500",
             ].join(" ")}
           >
-            Apply
+            {isUpdating ? "Applying..." : "Apply"}
           </button>
         ) : (
           <button
             type="button"
-            onClick={onRemove}
-            className="h-11 shrink-0 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.99]"
+            disabled={disabled || isUpdating}
+            onClick={disabled || isUpdating ? undefined : () => {
+              setIsUpdating(true)
+              Promise.resolve(onRemove?.()).finally(() => setIsUpdating(false))
+            }}
+            className="h-11 shrink-0 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Remove
+            {isUpdating ? "Removing..." : "Remove"}
           </button>
         )}
+
       </div>
 
       {error ? (

@@ -6,6 +6,7 @@ import FloatingCart from "../cart/cartComponents/FloatingCart";
 import { useParams } from "react-router-dom";
 import { fetchRestaurantDetails } from "../../services/restaurantService";
 import ReviewList from "../../components/review/ReviewList";
+import EmptyState from "../../components/layout/EmptyState";
 
 function KitchenPage() {
   const [open, setOpen] = useState(false);
@@ -61,8 +62,14 @@ function KitchenPage() {
   }
 
   if (error || !kitchenPage?.kitchen) {
+    if (error) {
+      return <div className="p-6 text-center">{error}</div>;
+    }
+
     return (
-      <div className="p-6 text-center">{error || "Kitchen not found"}</div>
+      <div className="p-6">
+        <EmptyState />
+      </div>
     );
   }
   const kitchen = {
@@ -83,18 +90,22 @@ function KitchenPage() {
         categories={kitchenPage.categories}
         onSelect={setSelectedCategory}
       />
-      <MenuSection title={selectedCategory} foods={visibleMenuItems} />
 
-      {open && (
-        <ChatWindow
-          messages={messages}
-          sendMessage={sendMessage}
-          closeChat={() => setOpen(false)}
-        />
+      {visibleMenuItems.length > 0 ? (
+        <MenuSection title={selectedCategory} foods={visibleMenuItems} />
+      ) : (
+        <div className="px-4 py-6">
+          <h3 className="text-lg font-semibold text-slate-900">
+            {selectedCategory}
+          </h3>
+          <div className="mt-4">
+            <EmptyState />
+          </div>
+        </div>
       )}
 
       <FloatingCart />
-      <ChatButton openChat={() => setOpen(true)} />
+      
     </div>
   );
 }

@@ -31,7 +31,8 @@ function PopularFoodsSlider() {
       .then((response) => {
         if (!ignore) {
           const items = (response.data ?? []).map((item) => ({
-            id: item.food.id,
+            id: item.id,
+            foodId: item.food.id,
             name: item.food.name,
             slug: item.food.slug,
             image: item.image,

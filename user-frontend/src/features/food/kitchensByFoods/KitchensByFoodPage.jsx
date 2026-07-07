@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import KitchenGrid from "../../../components/kitchen/KitchenGrid";
 import CategoryFilter from "../../../components/filters/CategoryFilter";
+import EmptyState from "../../../components/layout/EmptyState";
 import {
   fetchFoodCategories,
   fetchFoods,
@@ -100,7 +101,15 @@ export default function KitchensByFoodPage() {
       </p>
       {isLoading ? <p className="px-5 text-sm text-slate-600">Loading kitchens...</p> : null}
       {error ? <p className="px-5 text-sm text-red-600">{error}</p> : null}
-      {!isLoading && !error ? <KitchenGrid kitchens={kitchens} /> : null}
+      {!isLoading && !error ? (
+        kitchens.length > 0 ? (
+          <KitchenGrid kitchens={kitchens} />
+        ) : (
+          <div className="px-5 py-8">
+            <EmptyState />
+          </div>
+        )
+      ) : null}
     </div>
   );
 }
