@@ -2,6 +2,7 @@
 import { sendResponse } from "../utils/sendResponse.js";
 import {
   createUserAddress,
+  deleteUserAccount,
   editUserAddress,
   listUserAddresses,
   removeUserAddress,
@@ -103,6 +104,22 @@ export const deleteAddress = async (req, res, next) => {
 
     sendResponse(res, {
       message: "Address deleted successfully",
+      data: null,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteAccount = async (req, res, next) => {
+  try {
+    await deleteUserAccount({
+      userId: req.user._id,
+      email: req.user.email,
+    });
+
+    sendResponse(res, {
+      message: "Account deleted permanently",
       data: null,
     });
   } catch (err) {

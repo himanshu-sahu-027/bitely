@@ -8,6 +8,23 @@ const AUTH_STORAGE_KEY = "bitely.auth";
 
 const AuthContext = createContext(null);
 
+function normalizeSession(nextSession) {
+  if (!nextSession) {
+    return null;
+  }
+
+  const sessionCandidate = nextSession.data ?? nextSession;
+
+  if (!sessionCandidate?.token) {
+    return null;
+  }
+
+  return {
+    token: sessionCandidate.token,
+    user: sessionCandidate.user ?? null,
+  };
+}
+
 function readStoredSession() {
   if (typeof window === "undefined") {
     return null;
@@ -71,7 +88,7 @@ export function AuthProvider({ children }) {
             currentSession
               ? {
                   ...currentSession,
-                  user: response.data,
+                  user: response.data ?? null,
                 }
               : currentSession,
           );
@@ -104,16 +121,20 @@ export function AuthProvider({ children }) {
       user: session?.user ?? null,
       isAuthenticated: Boolean(session?.token),
       isBootstrapping,
-      login: (nextSession) => setSession(nextSession),
-      logout: async () => {
+      login: (nextSession) => setSession(normalizeSession(nextSession)),
+      logout: async (options = {}) => {
+        const { skipRequest = false, suppressErrorAlert = false } = options;
+
         try {
-          if (session?.token) {
+          if (!skipRequest && session?.token) {
             await logoutUser();
           }
         } catch {
-          window.alert(
-            "Server logout failed. Your account has been logged out locally.",
-          );
+          if (!suppressErrorAlert) {
+            window.alert(
+              "Server logout failed. Your account has been logged out locally.",
+            );
+          }
           // Clear stale sessions locally even if the API call fails.
         } finally {
           setSession(null);

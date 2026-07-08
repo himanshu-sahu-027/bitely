@@ -31,7 +31,7 @@ function SearchResultDropdown({
 
               {results.foods.map((food) => (
                 <button
-                  key={food._id}
+                  key={food.id ?? food._id}
                   onClick={() => onFoodClick(food)}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
                 >
@@ -50,7 +50,7 @@ function SearchResultDropdown({
 
               {results.kitchens.map((kitchen) => (
                 <button
-                  key={kitchen._id}
+                  key={kitchen.id ?? kitchen._id}
                   onClick={() => onKitchenClick(kitchen)}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
                 >

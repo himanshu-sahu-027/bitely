@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  deleteAccount,
   getMe,
   updateProfile,
   addAddress,
@@ -30,6 +31,12 @@ router.put(
   roleAuthorize("user", "vendor", "admin"),
   validateBody(validateUpdateProfilePayload),
   updateProfile,
+);
+router.delete(
+  "/me",
+  protect,
+  roleAuthorize("user", "vendor", "admin"),
+  deleteAccount,
 );
 
 

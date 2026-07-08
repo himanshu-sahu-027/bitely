@@ -4,6 +4,7 @@ export const config = {
   PORT: Number(process.env.PORT || 5000),
   DEV_MODE: String(process.env.DEV_MODE || "false").toLowerCase() === "true",
   MONGO_URI: process.env.MONGODB_URI || process.env.MONGO_URI,
+  MONGO_DB_NAME: process.env.MONGO_DB_NAME || "bitely",
   JWT_SECRET: process.env.JWT_SECRET,
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:5173",
   REDIS_HOST: process.env.REDIS_HOST || "127.0.0.1",
@@ -18,6 +19,7 @@ export const config = {
   RAZORPAY_KEY_SECRET:
     process.env.RAZORPAY_SECRET || process.env.RAZORPAY_KEY_SECRET,
   RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET,
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
 };
 
 const requiredEnvVars = ["MONGO_URI", "JWT_SECRET"];

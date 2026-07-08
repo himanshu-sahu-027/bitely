@@ -14,6 +14,7 @@ import { OAuth2Client } from "google-auth-library";
 import User from "../models/user/user.model.js";
 import AuthSession from "../models/user/authSession.model.js";
 import EmailVerificationOtp from "../models/user/emailVerificationOtp.model.js";
+import PendingSignup from "../models/user/pendingSignup.model.js";
 
 // Register
 // =======================
@@ -29,37 +30,46 @@ export const register = async (req, res, next) => {
       throw createHttpError("Passwords do not match", 400);
     }
 
-    validateSendOtp({ identifier: email, type: "email" });
+    const normalizedEmail = email.trim().toLowerCase();
 
-    const existing = await User.findOne({ email: email.trim().toLowerCase() });
-    if (existing) {
+    validateSendOtp({ identifier: normalizedEmail, type: "email" });
+
+    // Reject verified users
+    const existingVerifiedUser = await User.findOne({ email: normalizedEmail });
+    if (existingVerifiedUser) {
       throw createHttpError("Account already exists", 400);
     }
 
+    // Generate OTP and timestamps
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      password: passwordHash,
-      authProvider: "email",
-      isVerified: false,
-      role: "user",
-      is_active: true,
-    });
-
-    // Generate and send verification OTP
     const otp = generateOTP();
     const now = new Date();
-    const expiry = new Date(now.getTime() + 5 * 60 * 1000);
+    const otpExpiry = new Date(now.getTime() + 5 * 60 * 1000);
     const cooldownUntil = new Date(now.getTime() + 60 * 1000);
 
+    // Upsert pending signup (replace if a valid pending signup exists)
+    await PendingSignup.findOneAndUpdate(
+      { email: normalizedEmail },
+      {
+        $set: {
+          name: name.trim(),
+          email: normalizedEmail,
+          passwordHash,
+          expiresAt: otpExpiry,
+          createdBy: "email",
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    // Store OTP in EmailVerificationOtp (OTP lifecycle remains isolated here)
     await EmailVerificationOtp.findOneAndUpdate(
-      { email: user.email },
+      { email: normalizedEmail },
       {
         $set: {
           otp,
-          expiresAt: expiry,
+          expiresAt: otpExpiry,
           cooldownUntil,
           attemptCount: 0,
         },
@@ -67,13 +77,23 @@ export const register = async (req, res, next) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    // Reuse existing OTP email delivery content/SMTP setup
-    await deliverEmailOtp({ identifier: user.email, otp });
+    // Send email
+    try {
+      await deliverEmailOtp({ identifier: normalizedEmail, otp });
 
-    sendResponse(res, {
-      message: "Registration successful. Please verify your email.",
-      data: null,
-    });
+      sendResponse(res, {
+        message: "Registration successful. Please verify your email.",
+        data: null,
+      });
+    } catch (emailErr) {
+      // Cleanup OTP + pending signup if email sending fails
+      await Promise.all([
+        EmailVerificationOtp.deleteMany({ email: normalizedEmail }).catch(() => null),
+        PendingSignup.deleteMany({ email: normalizedEmail }).catch(() => null),
+      ]);
+
+      throw emailErr;
+    }
   } catch (err) {
     next(err);
   }
@@ -90,9 +110,9 @@ export const verifyEmail = async (req, res, next) => {
       throw createHttpError("Email and OTP are required", 400);
     }
 
-    validateSendOtp({ identifier: email, type: "email" });
-
     const normalizedEmail = email.trim().toLowerCase();
+
+    validateSendOtp({ identifier: normalizedEmail, type: "email" });
 
     const record = await EmailVerificationOtp.findOne({ email: normalizedEmail });
     if (!record) {
@@ -102,11 +122,6 @@ export const verifyEmail = async (req, res, next) => {
     if (record.expiresAt <= new Date()) {
       await record.deleteOne();
       throw createHttpError("OTP expired", 400);
-    }
-
-    if (record.cooldownUntil && record.cooldownUntil > new Date()) {
-      // Optional cooldown enforcement (same idea as other OTP flows)
-      throw createHttpError("Please wait before retrying OTP", 400);
     }
 
     if (record.attemptCount >= 5) {
@@ -119,19 +134,42 @@ export const verifyEmail = async (req, res, next) => {
       throw createHttpError("Invalid OTP", 400);
     }
 
-    // mark user verified
-    const user = await User.findOne({ email: normalizedEmail });
-    if (!user) {
-      throw createHttpError("Account not found", 404);
+    const pending = await PendingSignup.findOne({ email: normalizedEmail });
+    if (!pending) {
+      throw createHttpError("Pending signup not found", 400);
     }
 
-    user.isVerified = true;
-    user.authProvider = user.authProvider || "email";
-    await user.save();
+    if (pending.expiresAt <= new Date()) {
+      await pending.deleteOne().catch(() => null);
+      throw createHttpError("OTP expired", 400);
+    }
 
-    await record.deleteOne();
+    // Ensure no verified user exists (avoid duplicates)
+    const alreadyVerifiedUser = await User.findOne({ email: normalizedEmail });
+    if (alreadyVerifiedUser) {
+      // Cleanup stale OTP if any
+      await record.deleteOne().catch(() => null);
+      throw createHttpError("Account already verified", 400);
+    }
 
-    // Issue JWT + session
+    // Create the verified user only after successful OTP validation
+    const user = await User.create({
+      name: pending.name,
+      email: pending.email,
+      password: pending.passwordHash,
+      authProvider: "email",
+      isVerified: true,
+      role: "user",
+      is_active: true,
+    });
+
+    // Cleanup: delete pending + OTP
+    await Promise.all([
+      pending.deleteOne().catch(() => null),
+      record.deleteOne().catch(() => null),
+    ]);
+
+    // Issue JWT + session (do not change response contract)
     const token = config && config.JWT_SECRET ? jwt.sign(
       { id: user._id, role: user.role },
       config.JWT_SECRET,
@@ -292,6 +330,68 @@ export const googleSignIn = async (req, res, next) => {
     sendResponse(res, {
       message: "Google login successful",
       data: { token, user },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// =======================
+//  Resend Verification OTP
+// =======================
+export const resendVerificationOtp = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      throw createHttpError("Email is required", 400);
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Ensure there is a pending signup to resend for
+    const pending = await PendingSignup.findOne({ email: normalizedEmail });
+    if (!pending) {
+      throw createHttpError(
+        "No pending signup found for this email. Please register again.",
+        404,
+      );
+    }
+
+    if (pending.expiresAt <= new Date()) {
+      await pending.deleteOne().catch(() => null);
+      throw createHttpError(
+        "Pending signup expired. Please register again.",
+        404,
+      );
+    }
+
+    // Generate new OTP + timestamps
+    const otp = generateOTP();
+    const now = new Date();
+    const otpExpiry = new Date(now.getTime() + 5 * 60 * 1000);
+    const cooldownUntil = new Date(now.getTime() + 60 * 1000);
+
+    // Replace/update OTP record
+    await EmailVerificationOtp.findOneAndUpdate(
+      { email: normalizedEmail },
+      {
+        $set: {
+          otp,
+          expiresAt: otpExpiry,
+          cooldownUntil,
+          attemptCount: 0,
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+
+    // Send OTP email (verification purpose)
+    await deliverEmailOtp({ identifier: normalizedEmail, otp });
+
+    sendResponse(res, {
+      message: "Verification OTP resent successfully",
+      data: null,
     });
   } catch (err) {
     next(err);

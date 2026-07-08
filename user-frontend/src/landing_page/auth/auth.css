@@ -14,6 +14,10 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.floating-input input.floating-input--with-toggle {
+  padding-right: 44px;
+}
+
 .floating-input label {
   position: absolute;
   left: 12px;
@@ -25,6 +29,20 @@
   font-size: 14px;
   pointer-events: none;
   transition: 0.2s ease;
+}
+
+.floating-input-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
 }
 
 /* When input focused */

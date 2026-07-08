@@ -76,13 +76,13 @@ function SearchBar() {
   const handleFoodClick = (food) => {
     setShowDropdown(false);
     setQuery("");
-    navigate(`/food/${food.slug || food._id}`)
+    navigate(`/food/${food.slug || food.id || food._id}`);
   };
 
   const handleKitchenClick = (kitchen) => {
     setShowDropdown(false);
     setQuery("");
-    navigate(`/kitchen/${kitchen._id}`)
+    navigate(`/kitchen/${kitchen.id || kitchen._id}`);
   };
 
   const handleEnter = (e) => {

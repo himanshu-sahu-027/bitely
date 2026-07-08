@@ -10,6 +10,11 @@ export async function updateProfile(payload) {
   return response.data;
 }
 
+export async function deleteCurrentUser() {
+  const response = await api.delete("/api/user/me");
+  return response.data;
+}
+
 export async function fetchAddresses() {
   const response = await api.get("/api/user/address");
   return response.data;

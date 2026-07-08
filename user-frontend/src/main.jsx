@@ -6,14 +6,17 @@ import "./index.css"
 import "./styles/location-picker.css"
 import { CartProvider } from "./context/CartContext"
 import { AuthProvider } from "./context/AuthContext"
+import { GoogleOAuthProvider } from "@react-oauth/google"
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
 
     <AuthProvider>
-      <CartProvider>
-        <App />
-      </CartProvider>
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+        <CartProvider>
+          <App />
+        </CartProvider>
+      </GoogleOAuthProvider>
     </AuthProvider>
 
   </React.StrictMode>

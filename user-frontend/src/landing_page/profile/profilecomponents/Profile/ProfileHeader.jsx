@@ -1,4 +1,4 @@
-import { Mail, Phone, User } from "lucide-react";
+import { Mail, User } from "lucide-react";
 
 export default function ProfileHeader({ profile, onEdit }) {
   return (
@@ -13,14 +13,7 @@ export default function ProfileHeader({ profile, onEdit }) {
               <div className="text-3xl font-extrabold tracking-tight drop-shadow-sm">
                 {profile.name}
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-white/90">
-                <div className="flex items-center gap-1.5">
-                  <Phone size={15} strokeWidth={2.4} />
-                  <span>{profile.phone}</span>
-                </div>
-                <span aria-hidden="true" className="text-white/70">
-                  •
-                </span>
+              <div className="mt-2 flex flex-wrap items-center gap-y-2 text-sm text-white/90">
                 <div className="flex items-center gap-1.5">
                   <Mail size={15} strokeWidth={2.4} />
                   <span>{profile.email}</span>

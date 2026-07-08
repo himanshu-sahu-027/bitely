@@ -57,6 +57,7 @@ function EmailLogin() {
         type="password"
         value={password}
         onChange={(event) => setPassword(event.target.value)}
+        enablePasswordToggle
       />
     </div>
       

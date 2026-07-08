@@ -208,6 +208,7 @@ export const getPopularFoods = async (req, res, next) => {
 export const searchFoodsAndKitchens = async (req, res, next) => {
   try {
     const query = req.query.q?.trim();
+    const escapedQuery = query?.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     if (!query) {
       return sendResponse(res, {
@@ -247,8 +248,6 @@ export const searchFoodsAndKitchens = async (req, res, next) => {
     // Search must match BOTH:
     // - Menu.name
     // - referenced Food.name
-    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
     const menuNameRegex = { $regex: escapedQuery, $options: "i" };
     const foodNameRegex = { $regex: escapedQuery, $options: "i" };
 

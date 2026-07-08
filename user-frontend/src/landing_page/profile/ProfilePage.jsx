@@ -18,6 +18,7 @@ import {
 } from "../../services/orderService";
 import {
   createAddress,
+  deleteCurrentUser,
   deleteAddress,
   fetchAddresses,
   fetchProfile,
@@ -67,7 +68,6 @@ export default function ProfilePage({ initialTab = "orders" }) {
 
   const [profile, setProfile] = useState({
     name: user?.full_name || user?.name || "Bitely User",
-    phone: user?.phone || "",
     email: user?.email || "",
   });
   const [addresses, setAddresses] = useState([]);
@@ -99,8 +99,11 @@ export default function ProfilePage({ initialTab = "orders" }) {
         }
 
         setProfile({
-          name: profileResponse.data?.full_name || "Bitely User",
-          phone: profileResponse.data?.phone || "",
+          name:
+            profileResponse.data?.full_name ||
+            profileResponse.data?.name ||
+            user?.name ||
+            "Bitely User",
           email: profileResponse.data?.email || "",
         });
         setAddresses((addressResponse.data ?? []).map(normalizeAddress));
@@ -319,8 +322,17 @@ export default function ProfilePage({ initialTab = "orders" }) {
                       navigate("/", { replace: true });
                     }}
                     onDeleteAccount={async () => {
-                      await logout();
-                      navigate("/", { replace: true });
+                      try {
+                        await deleteCurrentUser();
+                        await logout({
+                          skipRequest: true,
+                          suppressErrorAlert: true,
+                        });
+                        window.alert("Your account has been deleted permanently.");
+                        navigate("/", { replace: true });
+                      } catch (deleteError) {
+                        window.alert(deleteError.message);
+                      }
                     }}
                   />
                 ) : null}
@@ -338,13 +350,11 @@ export default function ProfilePage({ initialTab = "orders" }) {
           onSave={async (nextProfile) => {
             try {
               const response = await updateProfile({
-                full_name: nextProfile.name,
-                email: nextProfile.email,
+                name: nextProfile.name,
               });
 
               setProfile({
-                name: response.data?.full_name || nextProfile.name,
-                phone: response.data?.phone || nextProfile.phone,
+                name: response.data?.full_name || response.data?.name || nextProfile.name,
                 email: response.data?.email || nextProfile.email,
               });
               setIsEditProfileOpen(false);
