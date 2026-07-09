@@ -2,16 +2,19 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 
 import { config } from "../config/env.js";
-import { Order } from "../models/orderCatalog/index.js";
+import { Order, OrderItem, OrderPricing, OrderStatusHistory } from "../models/orderCatalog/index.js";
 import { createHttpError } from "../utils/createHttpError.js";
 import { getRazorpayInstance, isRazorpayConfigured } from "../utils/razorpay.js";
 import { sendResponse } from "../utils/sendResponse.js";
 import Menu from "../models/kitchenCatalog/menu.model.js";
+import Kitchen from "../models/kitchenCatalog/kitchen.model.js";
 import {
   createPayment,
   markPaymentPaid,
   markPaymentFailed,
 } from "../services/orderService/payment.service.js";
+import { calculatePriceBreakdown } from "../services/orderService/orderPricing.service.js";
+import { buildStatusHistoryEntry } from "../services/orderService/orderStatus.service.js";
 
 const normalizeItems = (items = []) =>
   items.map((item) => ({
@@ -39,6 +42,16 @@ const buildFallbackKitchen = (items = []) => {
   };
 };
 
+const buildStoredDeliveryAddress = (deliveryAddress = {}, user = {}) => ({
+  fullName: user?.name || "",
+  phone: deliveryAddress.phone || user?.phone || "",
+  addressLine: deliveryAddress.addressLine || "",
+  city: deliveryAddress.city || "",
+  state: deliveryAddress.state || "",
+  pincode: deliveryAddress.pincode || "",
+  landmark: deliveryAddress.label || deliveryAddress.landmark || "",
+});
+
 const buildOrderDocument = ({
   req,
   normalizedItems,
@@ -46,21 +59,35 @@ const buildOrderDocument = ({
   paymentMethod,
   deliveryAddress,
   instructions,
+  kitchen,
 }) => {
   const userId = req.user._id;
-  const fallbackKitchen = buildFallbackKitchen(normalizedItems);
+  const fallbackKitchen = kitchen
+    ? {
+        kitchenId: kitchen._id,
+        kitchenName: kitchen.name,
+        kitchenImageUrl: kitchen.imageUrl || "",
+      }
+    : buildFallbackKitchen(normalizedItems);
 
   return {
     user: userId,
     userId: userId,
-    items: normalizedItems,
     totalAmount,
     paymentMethod,
     paymentStatus: "pending",
-    deliveryAddress,
+    deliveryAddress: buildStoredDeliveryAddress(deliveryAddress, req.user),
+    status: "placed",
     orderStatus: "placed",
     placedAt: new Date(),
     instructions: instructions || "",
+    items: normalizedItems.map((item) => ({
+      menuId: item.menuId,
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      image: item.image || "",
+    })),
     ...fallbackKitchen,
   };
 };
@@ -74,12 +101,21 @@ const createGatewayOrder = async ({ amount, receipt }) => {
   }
 
   const razorpay = getRazorpayInstance();
+  try {
+    return await razorpay.orders.create({
+      amount,
+      currency: "INR",
+      receipt,
+    });
+  } catch (error) {
+    const gatewayMessage =
+      error?.error?.description ||
+      error?.error?.reason ||
+      error?.message ||
+      "Failed to create Razorpay order";
 
-  return razorpay.orders.create({
-    amount,
-    currency: "INR",
-    receipt,
-  });
+    throw createHttpError(gatewayMessage, error?.statusCode || 400);
+  }
 };
 
 const buildSignature = ({ razorpayOrderId, razorpayPaymentId, secret }) =>
@@ -113,7 +149,7 @@ export const createPaymentOrder = async (req, res, next) => {
     const menus = await Menu.find({
       _id: { $in: menuIds },
     })
-      .select("_id price kitchen_id")
+      .select("_id name imageUrl price kitchen_id")
       .lean();
 
     // Required: if any menuId is not found in DB, return 404.
@@ -122,6 +158,17 @@ export const createPaymentOrder = async (req, res, next) => {
     }
 
     const menuPriceMap = new Map(menus.map((m) => [String(m._id), m.price]));
+    const menuById = new Map(menus.map((menu) => [String(menu._id), menu]));
+
+    const kitchenIds = [...new Set(menus.map((menu) => String(menu.kitchen_id)))];
+    if (kitchenIds.length !== 1) {
+      throw createHttpError("All order items must belong to the same kitchen", 400);
+    }
+
+    const kitchen = await Kitchen.findById(kitchenIds[0]).lean();
+    if (!kitchen) {
+      throw createHttpError("Kitchen not found", 404);
+    }
 
     for (const [id, price] of menuPriceMap.entries()) {
       if (!Number.isFinite(Number(price)) || Number(price) < 0) {
@@ -136,26 +183,112 @@ export const createPaymentOrder = async (req, res, next) => {
         throw createHttpError("Menu not found", 404);
       }
 
+      const menu = menuById.get(idKey);
       const serverPrice = menuPriceMap.get(idKey);
 
-      return { ...item, price: Number(serverPrice) };
+      return {
+        ...item,
+        name: menu?.name || item.name || "Menu item",
+        image: menu?.imageUrl || item.image || "",
+        price: Number(serverPrice),
+      };
     });
 
-    const serverTotalAmount = normalizedItems.reduce(
-      (sum, item) => sum + Number(item.quantity) * Number(item.price),
-      0
-    );
+    const serverPricing = calculatePriceBreakdown({
+      items: normalizedItems,
+    });
+    const serverTotalAmount = serverPricing.finalTotal;
 
-    const order = await Order.create(
-      buildOrderDocument({
-        req,
-        normalizedItems,
-        totalAmount: serverTotalAmount,
-        paymentMethod: payload.paymentMethod,
-        deliveryAddress: payload.deliveryAddress,
-        instructions: payload.instructions || "",
-      })
-    );
+    const amountInPaise = Math.round(Number(serverTotalAmount) * 100);
+    const pendingRazorpayOrder =
+      payload.paymentMethod === "ONLINE"
+        ? await createGatewayOrder({
+            amount: amountInPaise,
+            // Razorpay receipts have a short length limit; keep it deterministic and compact.
+            receipt: `bitely_${Date.now().toString().slice(-10)}`,
+          })
+        : null;
+
+    const session = await mongoose.startSession();
+    let order;
+
+    try {
+      await session.withTransaction(async () => {
+        [order] = await Order.create(
+          [
+            {
+              ...buildOrderDocument({
+                req,
+                normalizedItems,
+                totalAmount: serverTotalAmount,
+                paymentMethod: payload.paymentMethod,
+                deliveryAddress: payload.deliveryAddress,
+                instructions: payload.instructions || "",
+                kitchen,
+              }),
+              razorpayOrderId: pendingRazorpayOrder?.id ?? null,
+            },
+          ],
+          { session },
+        );
+
+        if (normalizedItems.length > 0) {
+          await OrderItem.insertMany(
+            normalizedItems.map((item) => ({
+              orderId: order._id,
+              menuId: item.menuId,
+              name: item.name,
+              price: item.price,
+              imageUrl: item.image || "",
+              quantity: item.quantity,
+            })),
+            { session },
+          );
+        }
+
+        await OrderPricing.create(
+          [
+            {
+              orderId: order._id,
+              order_id: order._id,
+              ...serverPricing,
+            },
+          ],
+          { session },
+        );
+
+        await OrderStatusHistory.create(
+          [
+            buildStatusHistoryEntry({
+              orderId: order._id,
+              status: "placed",
+              message: "Order placed successfully",
+            }),
+          ],
+          { session },
+        );
+
+        await createPayment(
+          {
+            orderId: order._id,
+            userId: order.userId,
+            kitchenId: order.kitchenId,
+            gateway: pendingRazorpayOrder ? "razorpay" : "cod",
+            gatewayOrderId: pendingRazorpayOrder?.id ?? null,
+            transactionId: null,
+            gatewaySignature: null,
+            amount: order.totalAmount,
+            method: order.paymentMethod,
+            currency: "INR",
+            status: "pending",
+            paidAt: null,
+          },
+          session,
+        );
+      });
+    } finally {
+      session.endSession();
+    }
 
     if (payload.paymentMethod === "COD") {
       return sendResponse(res, {
@@ -169,37 +302,12 @@ export const createPaymentOrder = async (req, res, next) => {
       });
     }
 
-    const amountInPaise = Math.round(Number(serverTotalAmount) * 100);
-    const receipt = `bitely_${order._id}_${Date.now()}`;
-    const razorpayOrder = await createGatewayOrder({
-      amount: amountInPaise,
-      receipt,
-    });
-
-    order.razorpayOrderId = razorpayOrder.id;
-    await order.save();
-
-    await createPayment({
-      orderId: order._id,
-      userId: order.userId,
-      kitchenId: order.kitchenId,
-      gateway: "razorpay",
-      gatewayOrderId: razorpayOrder.id,
-      transactionId: null,
-      gatewaySignature: null,
-      amount: order.totalAmount,
-      method: order.paymentMethod,
-      currency: "INR",
-      status: "pending",
-      paidAt: null,
-    });
-
     return sendResponse(res, {
       statusCode: 201,
       message: "Razorpay order created successfully",
       data: {
         order,
-        razorpayOrder,
+        razorpayOrder: pendingRazorpayOrder,
         keyId: config.RAZORPAY_KEY_ID,
       },
     });

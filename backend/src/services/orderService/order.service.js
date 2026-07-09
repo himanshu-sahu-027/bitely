@@ -1,6 +1,14 @@
+import mongoose from "mongoose";
+
 import Kitchen from "../../models/kitchenCatalog/kitchen.model.js";
 import Menu from "../../models/kitchenCatalog/menu.model.js";
-import { Order, OrderItem, OrderPricing, OrderStatusHistory } from "../../models/orderCatalog/index.js";
+import {
+  Order,
+  OrderItem,
+  OrderPricing,
+  OrderStatusHistory,
+  Payment,
+} from "../../models/orderCatalog/index.js";
 import { createHttpError } from "../../utils/createHttpError.js";
 import {
   buildStatusHistoryEntry,
@@ -8,6 +16,7 @@ import {
 } from "./orderStatus.service.js";
 import { calculatePriceBreakdown } from "./orderPricing.service.js";
 import { buildOrderCancelledEvent, buildOrderPlacedEvent } from "./notification.service.js";
+import { createPayment } from "./payment.service.js";
 
 // Core order lifecycle operations.
 
@@ -37,7 +46,7 @@ const buildCreateOrderItems = async (items = []) => {
 
     return {
       menuId: menu._id,
-      kitchenId: menu.kitchenId,
+      kitchenId: menu.kitchen_id,
       name: menu.name,
       price: menu.price,
       imageUrl: menu.imageUrl,
@@ -107,44 +116,93 @@ export const createOrder = async ({
     pricingInput: {},
   });
 
-  const order = await Order.create({
-    userId,
-    kitchenId,
-    kitchenName,
-    kitchenImageUrl,
-    status: "placed",
-    placedAt: new Date(),
-    paymentMethod,
-    paymentStatus,
-    totalAmount: pricing.finalTotal,
-    instructions,
-  });
+  const session = await mongoose.startSession();
+  let order;
+  try {
+    await session.withTransaction(async () => {
+      [order] = await Order.create(
+        [
+          {
+            userId,
+            kitchenId,
+            kitchenName,
+            kitchenImageUrl,
+            status: "placed",
+            orderStatus: "placed",
+            placedAt: new Date(),
+            paymentMethod,
+            paymentStatus,
+            totalAmount: pricing.finalTotal,
+            instructions,
+            items: items.map((item) => ({
+              menuId: item.menuId,
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price,
+              image: item.imageUrl || "",
+            })),
+          },
+        ],
+        { session }
+      );
 
-  if (items.length > 0) {
-    await OrderItem.insertMany(
-      items.map((item) => ({
-        orderId: order._id,
-        menuId: item.menuId,
-        name: item.name,
-        price: item.price,
-        imageUrl: item.imageUrl,
-        quantity: item.quantity,
-      }))
-    );
+      if (items.length > 0) {
+        await OrderItem.insertMany(
+          items.map((item) => ({
+            orderId: order._id,
+            menuId: item.menuId,
+            name: item.name,
+            price: item.price,
+            imageUrl: item.imageUrl,
+            quantity: item.quantity,
+          })),
+          { session }
+        );
+      }
+
+      await OrderPricing.create(
+        [
+          {
+            orderId: order._id,
+            order_id: order._id,
+            ...pricing,
+          },
+        ],
+        { session }
+      );
+
+      await OrderStatusHistory.create(
+        [
+          buildStatusHistoryEntry({
+            orderId: order._id,
+            status: "placed",
+            message: "Order placed successfully",
+          }),
+        ],
+        { session }
+      );
+
+      await createPayment(
+        {
+          orderId: order._id,
+          userId,
+          kitchenId,
+          gateway: paymentMethod === "COD" ? "cod" : "manual",
+          gatewayOrderId: null,
+          transactionId: null,
+          gatewaySignature: null,
+          amount: pricing.finalTotal,
+          method: paymentMethod,
+          currency: "INR",
+          status: paymentStatus,
+          paidAt: paymentStatus === "paid" ? new Date() : null,
+        },
+        session
+      );
+    });
+  } finally {
+    session.endSession();
   }
-
-  await OrderPricing.create({
-    orderId: order._id,
-    ...pricing,
-  });
-
-  await OrderStatusHistory.create(
-    buildStatusHistoryEntry({
-      orderId: order._id,
-      status: "placed",
-      message: "Order placed successfully",
-    })
-  );
 
   return {
     order,
@@ -159,27 +217,92 @@ export const cancelOrder = async (orderId) => {
     throw createHttpError("Order not found", 404);
   }
 
-  const cancellation = checkCancellationEligibility({ order });
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
 
-  if (!cancellation.canCancel) {
-    throw createHttpError(cancellation.reason, 400);
+    // Re-fetch order/payment inside the transaction for consistency.
+    const orderInTx = await Order.findById(orderId).session(session);
+    if (!orderInTx) {
+      throw createHttpError("Order not found", 404);
+    }
+
+    const cancellation = checkCancellationEligibility({ order: orderInTx });
+
+    if (!cancellation.canCancel) {
+      throw createHttpError(cancellation.reason, 400);
+    }
+
+    const paymentInTx = await Payment.findOne({ orderId }).session(session);
+
+    // Enforce synchronization rules.
+    if (paymentInTx?.status === "paid" || orderInTx.paymentStatus === "paid") {
+      // No refund workflow exists yet; never overwrite payment state.
+      const err = createHttpError(
+        "Cannot cancel a paid order. Refund workflow is not implemented yet.",
+        409
+      );
+      throw err;
+    }
+
+    if (paymentInTx?.status === "pending") {
+      // pending -> cancelled
+      orderInTx.paymentStatus = "cancelled";
+
+      // Update payment ledger
+      // Note: markPaymentCancelled() doesn't support session, so do the update here.
+      paymentInTx.status = "cancelled";
+      paymentInTx.failureReason = null;
+      paymentInTx.paidAt = null;
+      await paymentInTx.save({ session });
+    } else if (
+      paymentInTx?.status === "cancelled" ||
+      paymentInTx?.status === "failed" ||
+      paymentInTx?.status === "refunded"
+    ) {
+      // Leave Payment.status unchanged.
+      // Cancellation updates Order.paymentStatus only for pending->cancelled rule;
+      // if payment wasn't pending, do not modify further.
+      // (If your existing architecture requires other mapping, that can be added later.)
+    } else if (!paymentInTx && orderInTx.paymentStatus === "pending") {
+      orderInTx.paymentStatus = "cancelled";
+    }
+
+    // Update order status + terminal timestamp invariants
+    orderInTx.status = "cancelled";
+    orderInTx.orderStatus = "cancelled";
+
+    const now = new Date();
+    orderInTx.cancelledAt = now;
+    orderInTx.deliveredAt = null;
+
+    await orderInTx.save({ session });
+
+    // Insert history inside the transaction
+    await OrderStatusHistory.create(
+      [
+        buildStatusHistoryEntry({
+          orderId: orderInTx._id,
+          status: "cancelled",
+          message: "Order cancelled",
+        }),
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+
+    const updatedOrder = orderInTx.toObject ? orderInTx.toObject() : orderInTx;
+
+    return {
+      order: updatedOrder,
+      cancellation,
+      event: buildOrderCancelledEvent(updatedOrder),
+    };
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
   }
-
-  order.status = "cancelled";
-  order.cancelledAt = new Date();
-  await order.save();
-
-  await OrderStatusHistory.create(
-    buildStatusHistoryEntry({
-      orderId: order._id,
-      status: "cancelled",
-      message: "Order cancelled",
-    })
-  );
-
-  return {
-    order,
-    cancellation,
-    event: buildOrderCancelledEvent(order),
-  };
 };

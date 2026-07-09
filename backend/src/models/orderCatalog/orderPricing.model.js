@@ -8,6 +8,12 @@ const orderPricingSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    order_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Order",
+      required: true,
+      unique: true,
+    },
     itemTotal: { type: Number, required: true, min: 0 },
     packagingFee: { type: Number, default: 0, min: 0 },
     platformFee: { type: Number, default: 0, min: 0 },
@@ -18,6 +24,16 @@ const orderPricingSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+orderPricingSchema.pre("validate", function syncLegacyOrderId() {
+  if (this.orderId && !this.order_id) {
+    this.order_id = this.orderId;
+  }
+
+  if (this.order_id && !this.orderId) {
+    this.orderId = this.order_id;
+  }
+});
 
 const OrderPricing =
   mongoose.models.OrderPricing ||

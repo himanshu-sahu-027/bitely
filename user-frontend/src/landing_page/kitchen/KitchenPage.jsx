@@ -1,28 +1,27 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+
 import CategoryMenu from "../../components/category/CategoryMenu";
 import { MenuSection } from "../../components/food";
 import { KitchenBanner } from "../../components/kitchen";
-import FloatingCart from "../cart/cartComponents/FloatingCart";
-import { useParams } from "react-router-dom";
-import { fetchRestaurantDetails } from "../../services/restaurantService";
-import ReviewList from "../../components/review/ReviewList";
 import EmptyState from "../../components/layout/EmptyState";
+import CustomerReviewDrawer from "../../components/review/CustomerReviewDrawer";
+import { getFoodReviews, getKitchenReviews } from "../../services/reviewService";
+import { fetchRestaurantDetails } from "../../services/restaurantService";
+import FloatingCart from "../cart/cartComponents/FloatingCart";
 
 function KitchenPage() {
-  const [open, setOpen] = useState(false);
   const { id } = useParams();
   const [kitchenPage, setKitchenPage] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("Recommended");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [messages, setMessages] = useState([]);
-
-  const sendMessage = (text) => {
-    setMessages((currentMessages) => [
-      ...currentMessages,
-      { sender: "user", text },
-    ]);
-  };
+  const [reviewDrawer, setReviewDrawer] = useState({
+    isOpen: false,
+    title: "",
+    loadReviews: null,
+    emptyMessage: "No reviews yet.",
+  });
 
   useEffect(() => {
     let ignore = false;
@@ -57,6 +56,37 @@ function KitchenPage() {
     };
   }, [id, selectedCategory]);
 
+  const openKitchenReviews = useCallback(() => {
+    setReviewDrawer({
+      isOpen: true,
+      title: "Kitchen Reviews",
+      emptyMessage: "No kitchen reviews yet.",
+      loadReviews: async () => {
+        const response = await getKitchenReviews(id);
+        return response?.data ?? [];
+      },
+    });
+  }, [id]);
+
+  const openFoodReviews = useCallback(({ menuId, name }) => {
+    setReviewDrawer({
+      isOpen: true,
+      title: `${name} Reviews`,
+      emptyMessage: `No reviews yet for ${name}.`,
+      loadReviews: async () => {
+        const response = await getFoodReviews(menuId);
+        return response?.data ?? [];
+      },
+    });
+  }, []);
+
+  const closeReviewDrawer = () => {
+    setReviewDrawer((current) => ({
+      ...current,
+      isOpen: false,
+    }));
+  };
+
   if (isLoading) {
     return <div className="p-6 text-center">Loading kitchen...</div>;
   }
@@ -72,27 +102,33 @@ function KitchenPage() {
       </div>
     );
   }
+
   const kitchen = {
     ...kitchenPage.kitchen,
     image: kitchenPage.kitchen.imageUrl,
   };
+
   const visibleMenuItems = (kitchenPage.visibleMenuItems ?? []).map((menu) => ({
     ...menu,
     image: menu.imageUrl,
+    kitchen,
   }));
 
   return (
     <div>
-      <KitchenBanner kitchen={kitchen} />
+      <KitchenBanner kitchen={kitchen} onOpenReviews={openKitchenReviews} />
 
-      <ReviewList kitchenId={id} />
       <CategoryMenu
         categories={kitchenPage.categories}
         onSelect={setSelectedCategory}
       />
 
       {visibleMenuItems.length > 0 ? (
-        <MenuSection title={selectedCategory} foods={visibleMenuItems} />
+        <MenuSection
+          title={selectedCategory}
+          foods={visibleMenuItems}
+          onOpenFoodReviews={openFoodReviews}
+        />
       ) : (
         <div className="px-4 py-6">
           <h3 className="text-lg font-semibold text-slate-900">
@@ -105,7 +141,14 @@ function KitchenPage() {
       )}
 
       <FloatingCart />
-      
+
+      <CustomerReviewDrawer
+        isOpen={reviewDrawer.isOpen}
+        title={reviewDrawer.title}
+        loadReviews={reviewDrawer.loadReviews}
+        emptyMessage={reviewDrawer.emptyMessage}
+        onClose={closeReviewDrawer}
+      />
     </div>
   );
 }

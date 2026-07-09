@@ -20,21 +20,21 @@ const normalizeKitchen = (kitchen) => ({
   name: kitchen.name,
   image: kitchen.imageUrl,
   address: kitchen.address,
-  deliveryTime: kitchen.deliveryTime,
+  deliveryTime: kitchen.delivery_time || kitchen.deliveryTime,
 });
 
 const normalizeAddress = (address) => ({
   id: String(address._id),
   label: address.label,
   fullAddress: [
-    address.addressLine,
+    address.address_line || address.addressLine,
     address.city,
     address.state,
     address.pincode,
   ]
     .filter(Boolean)
     .join(", "),
-  isDefault: address.isDefault,
+  isDefault: Boolean(address.is_default || address.isDefault),
 });
 
 const normalizeOrder = (order) => ({
@@ -53,6 +53,7 @@ const normalizeOrder = (order) => ({
   paymentStatus: order.paymentStatus,
   totalAmount: order.totalAmount,
   instructions: order.instructions,
+  deliveryAddress: order.deliveryAddress || null,
   createdAt: order.createdAt,
 });
 
@@ -68,7 +69,7 @@ const normalizeOrderItem = (item) => ({
 
 const normalizeOrderPricing = (pricing) => ({
   id: String(pricing._id),
-  orderId: String(pricing.orderId),
+  orderId: String(pricing.orderId ?? pricing.order_id),
   itemTotal: pricing.itemTotal,
   packagingFee: pricing.packagingFee,
   platformFee: pricing.platformFee,
@@ -111,8 +112,8 @@ export const getUserProfileOrders = async (userId) => {
       OrderPricing.find().lean(),
       OrderStatusHistory.find().sort({ createdAt: 1 }).lean(),
       Kitchen.find().lean(),
-      UserAddress.find({ userId: userId })
-        .sort({ isDefault: -1, createdAt: 1 })
+      UserAddress.find({ user_id: userId })
+        .sort({ is_default: -1, createdAt: 1 })
         .lean(),
     ]);
 
@@ -184,7 +185,7 @@ export const getOrderDetails = async ({ orderId, actor = {} }) => {
         .sort({ createdAt: 1 })
         .lean(),
       Order.findById(orderId).populate("kitchenId").lean(),
-      actor.userId ? UserAddress.find({ userId: actor.userId }).lean() : [],
+      actor.userId ? UserAddress.find({ user_id: actor.userId }).lean() : [],
     ]);
 
   if (!order) {

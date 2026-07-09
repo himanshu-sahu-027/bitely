@@ -32,7 +32,20 @@ export default function buildProfileOrders({
   const mappedOrders = orders.map((order, index) => {
     const kitchen = kitchenById[order.kitchenId];
     const pricing = pricingByOrderId[order.id] ?? {};
-    const address = addresses[index % addresses.length];
+    const address =
+      order.deliveryAddress?.addressLine || order.deliveryAddress?.fullName
+        ? {
+            label: order.deliveryAddress?.landmark || "Delivery address",
+            fullAddress: [
+              order.deliveryAddress?.addressLine,
+              order.deliveryAddress?.city,
+              order.deliveryAddress?.state,
+              order.deliveryAddress?.pincode,
+            ]
+              .filter(Boolean)
+              .join(", "),
+          }
+        : addresses[index % addresses.length];
     const items = (itemsByOrderId[order.id] ?? []).map((item) => ({
       ...item,
       qty: item.quantity,
@@ -49,6 +62,7 @@ export default function buildProfileOrders({
     return {
       id: order.id,
       orderId: order.id,
+      kitchenId: order.kitchenId,
       kitchenName: order.kitchenName || kitchen?.name || "Kitchen",
       location: kitchen?.address || "Location unavailable",
       image: kitchen?.image || order.kitchenImageUrl,
@@ -80,12 +94,12 @@ export default function buildProfileOrders({
     };
   });
 
-  return {
-    active: mappedOrders.filter(
-      (order) => !["delivered", "cancelled"].includes(order.status)
-    ),
-    past: mappedOrders.filter((order) =>
-      ["delivered", "cancelled"].includes(order.status)
-    ),
-  };
+  const active = mappedOrders.filter(
+    (order) => !["delivered", "cancelled"].includes(order.status)
+  );
+
+  // Past Orders = Delivered ONLY (cancelled must never appear in purchase history)
+  const past = mappedOrders.filter((order) => order.status === "delivered");
+
+  return { active, past };
 }

@@ -8,60 +8,40 @@ function ReviewModal({
   initialRating = 5,
   initialReview = "",
   submitLabel = "Submit",
-  onDelete,
-  deleteLabel = "Delete Review",
-  deleteConfirmMessage = "Are you sure?",
+  readOnly = false,
+  helperText = "",
+  errorText = "",
 }) {
   const [rating, setRating] = useState(initialRating);
   const [review, setReview] = useState(initialReview);
   const [loading, setLoading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
     setRating(initialRating ?? 5);
     setReview(initialReview ?? "");
+    setError("");
   }, [isOpen, initialRating, initialReview]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async () => {
+    if (readOnly) return;
+
     setLoading(true);
+    setError("");
     try {
       await onSubmit({
         rating,
         review,
       });
-
-      alert("Review submitted successfully");
-
-      setReview("");
-      setRating(5);
-
       onClose();
     } catch (e) {
       console.error(e);
-      alert("Failed to submit review");
+      setError(e?.message || "Failed to submit review");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!onDelete) return;
-    const confirmed = window.confirm(deleteConfirmMessage);
-    if (!confirmed) return;
-
-    setDeleting(true);
-    try {
-      await onDelete();
-      alert("Review deleted successfully");
-      onClose();
-    } catch (e) {
-      console.error(e);
-      alert("Failed to delete review");
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -70,10 +50,15 @@ function ReviewModal({
       <div className="bg-white rounded-lg p-5 w-[400px]">
         <h2 className="text-xl font-semibold mb-4">{title}</h2>
 
+        {helperText ? (
+          <p className="mb-3 text-sm text-slate-600">{helperText}</p>
+        ) : null}
+
         <select
           value={rating}
           onChange={(e) => setRating(Number(e.target.value))}
-          className="border p-2 w-full"
+          disabled={readOnly || loading}
+          className="border p-2 w-full disabled:bg-slate-100 disabled:text-slate-600"
         >
           {[1, 2, 3, 4, 5].map((star) => (
             <option key={star} value={star}>
@@ -87,28 +72,24 @@ function ReviewModal({
           rows={4}
           placeholder="Write your review..."
           value={review}
+          disabled={readOnly || loading}
           onChange={(e) => setReview(e.target.value)}
         />
 
-        <div className="flex gap-2 mt-4">
-          {onDelete ? (
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="border px-4 py-2 rounded disabled:opacity-70"
-              type="button"
-            >
-              {deleting ? "Deleting..." : deleteLabel}
-            </button>
-          ) : null}
+        {error || errorText ? (
+          <div className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error || errorText}
+          </div>
+        ) : null}
 
+        <div className="flex gap-2 mt-4">
           <button
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || readOnly}
             className="bg-orange-500 text-white px-4 py-2 rounded disabled:opacity-70"
             type="button"
           >
-            {loading ? "Submitting..." : submitLabel}
+            {readOnly ? "Review Submitted" : loading ? "Submitting..." : submitLabel}
           </button>
 
           <button

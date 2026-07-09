@@ -38,7 +38,12 @@ export const buildRefundPayload = ({
 // Payment ledger helpers
 // -------------------------
 
-export const createPayment = async (data) => {
+export const createPayment = async (data, session = null) => {
+  if (session) {
+    const [payment] = await Payment.create([data], { session });
+    return payment;
+  }
+
   return Payment.create(data);
 };
 
@@ -91,6 +96,21 @@ export const markPaymentFailed = async (orderId, reason) => {
     {
       status: "failed",
       failureReason: reason ?? null,
+    },
+    { new: true },
+  );
+};
+
+export const markPaymentCancelled = async (orderId) => {
+  const payment = await findPaymentByOrder(orderId);
+  if (!payment) return null;
+
+  return Payment.findOneAndUpdate(
+    { orderId: orderId },
+    {
+      status: "cancelled",
+      failureReason: null,
+      paidAt: null,
     },
     { new: true },
   );

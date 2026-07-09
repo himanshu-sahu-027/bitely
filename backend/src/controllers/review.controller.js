@@ -1,20 +1,62 @@
+import mongoose from "mongoose";
+
 import KitchenReview from "../models/reviewCatalog/kitchenReview.model.js";
 import FoodReview from "../models/reviewCatalog/foodReview.model.js";
 import Kitchen from "../models/kitchenCatalog/kitchen.model.js";
 import Menu from "../models/kitchenCatalog/menu.model.js";
 import Order from "../models/orderCatalog/order.model.js";
+import OrderItem from "../models/orderCatalog/orderItem.model.js";
 
 import { sendResponse } from "../utils/sendResponse.js";
 import { createHttpError } from "../utils/createHttpError.js";
 
+const ensureObjectId = (value, fieldName) => {
+  if (!value || !String(value).trim()) {
+    throw createHttpError(`${fieldName} is required`, 400);
+  }
+};
+
+const validateReviewPayload = ({ orderId, rating }) => {
+  ensureObjectId(orderId, "orderId");
+
+  const parsedRating = Number(rating);
+  if (!Number.isFinite(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+    throw createHttpError("Rating must be between 1 and 5", 400);
+  }
+
+  return parsedRating;
+};
+
+const findDeliveredOrderForReview = ({ orderId, userId, kitchenId = null }) => {
+  const query = {
+    _id: orderId,
+    userId,
+    $or: [{ status: "delivered" }, { orderStatus: "delivered" }],
+  };
+
+  if (kitchenId) {
+    query.kitchenId = kitchenId;
+  }
+
+  return Order.findOne(query);
+};
+
 const updateKitchenRating = async (kitchenId) => {
   const stats = await KitchenReview.aggregate([
-    { $match: { kitchen_id: kitchenId } },
+    {
+      $match: {
+        kitchen_id: new mongoose.Types.ObjectId(kitchenId),
+      },
+    },
     {
       $group: {
         _id: null,
-        averageRating: { $avg: "$rating" },
-        totalRatings: { $sum: 1 },
+        averageRating: {
+          $avg: "$rating",
+        },
+        totalRatings: {
+          $sum: 1,
+        },
       },
     },
   ]);
@@ -22,20 +64,34 @@ const updateKitchenRating = async (kitchenId) => {
   const averageRating = stats.length ? stats[0].averageRating : 0;
   const totalRatings = stats.length ? stats[0].totalRatings : 0;
 
-  await Kitchen.findByIdAndUpdate(kitchenId, {
-    rating: averageRating,
-    totalRatings,
-  });
+  await Kitchen.findByIdAndUpdate(
+    kitchenId,
+    {
+      rating: averageRating,
+      totalRatings,
+    },
+    {
+      returnDocument: "after",
+    },
+  );
 };
 
 const updateFoodRating = async (menuId) => {
   const stats = await FoodReview.aggregate([
-    { $match: { menu_id: menuId } },
+    {
+      $match: {
+        menu_id: new mongoose.Types.ObjectId(menuId),
+      },
+    },
     {
       $group: {
         _id: null,
-        averageRating: { $avg: "$rating" },
-        totalRatings: { $sum: 1 },
+        averageRating: {
+          $avg: "$rating",
+        },
+        totalRatings: {
+          $sum: 1,
+        },
       },
     },
   ]);
@@ -43,10 +99,16 @@ const updateFoodRating = async (menuId) => {
   const averageRating = stats.length ? stats[0].averageRating : 0;
   const totalRatings = stats.length ? stats[0].totalRatings : 0;
 
-  await Menu.findByIdAndUpdate(menuId, {
-    rating: averageRating,
-    totalRatings,
-  });
+  await Menu.findByIdAndUpdate(
+    menuId,
+    {
+      rating: averageRating,
+      totalRatings,
+    },
+    {
+      returnDocument: "after",
+    },
+  );
 };
 
 // add kitchen review
@@ -54,12 +116,14 @@ export const addKitchenReview = async (req, res, next) => {
   try {
     const { kitchenId } = req.params;
     const { orderId, rating, review } = req.body;
+    const parsedRating = validateReviewPayload({ orderId, rating });
 
-    const order = await Order.findOne({
-      _id: orderId,
-      user_id: req.user._id,
-      kitchen_id: kitchenId,
-      status: "delivered",
+    ensureObjectId(kitchenId, "kitchenId");
+
+    const order = await findDeliveredOrderForReview({
+      orderId,
+      userId: req.user._id,
+      kitchenId,
     });
 
     if (!order) {
@@ -69,25 +133,29 @@ export const addKitchenReview = async (req, res, next) => {
     const existingReview = await KitchenReview.findOne({
       order_id: orderId,
       kitchen_id: kitchenId,
+      user_id: req.user._id,
     });
 
     if (existingReview) {
-      throw createHttpError("You already reviewed this kitchen", 400);
+      throw createHttpError(
+        "You already reviewed this kitchen for this order",
+        400,
+      );
     }
 
-    await KitchenReview.create({
+    const createdReview = await KitchenReview.create({
       kitchen_id: kitchenId,
       user_id: req.user._id,
       order_id: orderId,
-      rating,
+      rating: parsedRating,
       review,
     });
-
 
     await updateKitchenRating(kitchenId);
 
     return sendResponse(res, {
       message: "Kitchen review added successfully",
+      data: createdReview,
     });
   } catch (err) {
     next(err);
@@ -119,11 +187,12 @@ export const addFoodReview = async (req, res, next) => {
     const { menuId } = req.params;
 
     const { orderId, rating, review } = req.body;
+    const parsedRating = validateReviewPayload({ orderId, rating });
+    ensureObjectId(menuId, "menuId");
 
-    const order = await Order.findOne({
-      _id: orderId,
-      user_id: req.user._id,
-      status: "delivered",
+    const order = await findDeliveredOrderForReview({
+      orderId,
+      userId: req.user._id,
     });
 
     if (!order) {
@@ -135,32 +204,34 @@ export const addFoodReview = async (req, res, next) => {
       throw createHttpError("Food item not found", 404);
     }
 
-    const orderedFood = order.items.find(
-      (item) => String(item.menuId) === menuId
-    );
+    const orderedFood = await OrderItem.findOne({
+      orderId: orderId,
+      menuId: menuId,
+    }).lean();
 
     if (!orderedFood) {
-      throw createHttpError(
-        "You can only review ordered food",
-        403
-      );
+      throw createHttpError("You can only review ordered food", 403);
     }
 
     const exists = await FoodReview.findOne({
       order_id: orderId,
       menu_id: menuId,
+      user_id: req.user._id,
     });
 
     if (exists) {
-      throw createHttpError("Already reviewed", 400);
+      throw createHttpError(
+        "You already reviewed this food for this order",
+        400,
+      );
     }
 
-    await FoodReview.create({
+    const createdReview = await FoodReview.create({
       menu_id: menuId,
       kitchen_id: menu.kitchen_id,
       user_id: req.user._id,
       order_id: orderId,
-      rating,
+      rating: parsedRating,
       review,
     });
 
@@ -168,6 +239,7 @@ export const addFoodReview = async (req, res, next) => {
 
     return sendResponse(res, {
       message: "Food review added successfully",
+      data: createdReview,
     });
   } catch (err) {
     next(err);
@@ -286,4 +358,3 @@ export const deleteFoodReview = async (req, res, next) => {
     next(err);
   }
 };
-

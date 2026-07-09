@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Star } from "lucide-react";
+import { Check } from "lucide-react";
 import OrderViewDetailsDrawer from "./ViewDetails/OrderViewDetailsDrawer";
 import ReviewModal from "../../../../components/review/ReviewModal";
 import { useAuth } from "../../../../context/AuthContext";
@@ -7,13 +7,10 @@ import { useAuth } from "../../../../context/AuthContext";
 import {
   addKitchenReview,
   addFoodReview,
-  deleteFoodReview,
-  deleteKitchenReview,
   getFoodReviews,
   getKitchenReviews,
-  updateFoodReview,
-  updateKitchenReview,
 } from "../../../../services/reviewService";
+import dummyKitchenImg from "../../../../assets/images/dummy_kitchen_img.png";
 
 function OrderCard({ order, onReorder, onCancel, onPay }) {
   const { user } = useAuth();
@@ -29,11 +26,11 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
     rating: 5,
     review: "",
   });
+  const [reviewError, setReviewError] = useState("");
 
   const [myKitchenReview, setMyKitchenReview] = useState(null);
   const [myFoodReviewsByMenuId, setMyFoodReviewsByMenuId] = useState({}); // menuId -> review
   const [reviewsLoading, setReviewsLoading] = useState(false);
-
   const [foodReviewsOpen, setFoodReviewsOpen] = useState(false);
   const [foodReviewsMenuId, setFoodReviewsMenuId] = useState(null);
   const [foodReviewsList, setFoodReviewsList] = useState([]);
@@ -77,7 +74,9 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
       const kitchenReviews = kitchenResp?.data ?? kitchenResp ?? [];
       const mineKitchen = Array.isArray(kitchenReviews)
         ? kitchenReviews.find(
-            (r) => String(r.user_id?._id ?? r.user_id) === String(user._id),
+            (r) =>
+              String(r.user_id?._id ?? r.user_id) === String(user._id) &&
+              String(r.order_id?._id ?? r.order_id) === String(orderId),
           )
         : null;
 
@@ -94,7 +93,8 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
           const mineFood = Array.isArray(foodReviews)
             ? foodReviews.find(
                 (r) =>
-                  String(r.user_id?._id ?? r.user_id) === String(user._id),
+                  String(r.user_id?._id ?? r.user_id) === String(user._id) &&
+                  String(r.order_id?._id ?? r.order_id) === String(orderId),
               )
             : null;
 
@@ -129,6 +129,8 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
   }, [reviewOpen]);
 
   const handleReviewOpenForKitchen = () => {
+    setReviewError("");
+
     if (myKitchenReview) {
       setReviewInitial({
         rating: myKitchenReview.rating ?? 5,
@@ -140,6 +142,7 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
         kitchenId,
         orderId,
         reviewId: myKitchenReview._id,
+        readOnly: true,
       });
     } else {
       setReviewInitial({ rating: 5, review: "" });
@@ -147,6 +150,7 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
         type: "kitchen",
         kitchenId,
         orderId,
+        readOnly: false,
       });
     }
 
@@ -154,6 +158,8 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
   };
 
   const handleReviewOpenForFood = (menuId) => {
+    setReviewError("");
+
     const existing = myFoodReviewsByMenuId[menuId];
 
     if (existing) {
@@ -167,6 +173,7 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
         menuId,
         orderId,
         reviewId: existing._id,
+        readOnly: true,
       });
     } else {
       setReviewInitial({ rating: 5, review: "" });
@@ -174,6 +181,7 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
         type: "food",
         menuId,
         orderId,
+        readOnly: false,
       });
     }
 
@@ -183,63 +191,30 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
   const handleReviewSubmit = async ({ rating, review }) => {
     try {
       if (!reviewTarget) return;
+      if (reviewTarget.readOnly) return;
+
+      setReviewError("");
 
       if (reviewTarget.type === "kitchen") {
-        if (reviewTarget.reviewId) {
-          await updateKitchenReview(reviewTarget.reviewId, {
-            rating,
-            review,
-          });
-        } else {
-          await addKitchenReview(reviewTarget.kitchenId, {
-            orderId: reviewTarget.orderId,
-            rating,
-            review,
-          });
-        }
+        await addKitchenReview(reviewTarget.kitchenId, {
+          orderId: reviewTarget.orderId,
+          rating,
+          review,
+        });
       }
 
       if (reviewTarget.type === "food") {
-        if (reviewTarget.reviewId) {
-          await updateFoodReview(reviewTarget.reviewId, {
-            rating,
-            review,
-          });
-        } else {
-          await addFoodReview(reviewTarget.menuId, {
-            orderId: reviewTarget.orderId,
-            rating,
-            review,
-          });
-        }
+        await addFoodReview(reviewTarget.menuId, {
+          orderId: reviewTarget.orderId,
+          rating,
+          review,
+        });
       }
 
       // Ensure the currently displayed review UI updates immediately.
       await refreshKitchenAndFoodReviews();
     } catch (error) {
-      showError(error?.message || "Failed to save your review. Please try again.");
-      throw error;
-    }
-  };
-
-  const handleReviewDelete = async () => {
-    try {
-      if (!reviewTarget?.reviewId) return;
-
-      if (reviewTarget.type === "kitchen") {
-        await deleteKitchenReview(reviewTarget.reviewId);
-      }
-
-      if (reviewTarget.type === "food") {
-        await deleteFoodReview(reviewTarget.reviewId);
-      }
-
-      // Ensure the currently displayed review UI updates immediately.
-      await refreshKitchenAndFoodReviews();
-    } catch (error) {
-      showError(
-        error?.message || "Failed to delete your review. Please try again.",
-      );
+      setReviewError(error?.message || "Failed to save your review. Please try again.");
       throw error;
     }
   };
@@ -284,7 +259,7 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
                   }}
                   className="rounded bg-orange-500 px-3 py-1 text-white"
                 >
-                  {myKitchenReview ? "Edit Review" : "Rate Kitchen"}
+                  {myKitchenReview ? "Review Submitted" : "Rate Kitchen"}
                 </button>
 
                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500">
@@ -301,9 +276,12 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
           {/* Left: Kitchen Info */}
           <div className="flex min-w-0 flex-1 items-start gap-4">
             <img
-              src={order.image}
+              src={order.image || dummyKitchenImg}
               alt={order.kitchenName}
               className="h-16 w-16 flex-shrink-0 rounded-2xl border border-slate-100 object-cover"
+              onError={(event) => {
+                event.currentTarget.src = dummyKitchenImg;
+              }}
             />
 
             <div className="min-w-0">
@@ -349,33 +327,8 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
                           className="text-xs font-semibold text-orange-600"
                         >
                           {menuId && myFoodReviewsByMenuId[menuId]
-                            ? "Edit Food Review"
+                            ? "Review Submitted"
                             : "Rate Food"}
-                        </button>
-
-                        <button
-                          type="button"
-                        onClick={async () => {
-                          if (!menuId) return;
-
-                          try {
-                            setFoodReviewsLoading(true);
-                            const resp = await getFoodReviews(menuId);
-                            const list = resp?.data ?? resp ?? [];
-                            setFoodReviewsList(list);
-                            setFoodReviewsMenuId(menuId);
-                            setFoodReviewsOpen(true);
-                          } catch {
-                            showError(
-                              "Failed to load food reviews. Please try again.",
-                            );
-                          } finally {
-                            setFoodReviewsLoading(false);
-                          }
-                        }}
-                          className="text-xs text-slate-600 underline underline-offset-2"
-                        >
-                          View Reviews
                         </button>
                       </div>
                     ) : (
@@ -457,43 +410,12 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
                             : "bg-orange-500 text-white"
                         }`}
                       >
-                        {myFoodReview ? "Edit Food Review" : "Rate Food"}
+                        {myFoodReview ? "Review Submitted" : "Rate Food"}
                       </button>
                     ) : (
                       <span />
                     )}
                   </div>
-
-                  {!isActive ? (
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        disabled={!menuId}
-                        onClick={async () => {
-                          if (!menuId) return;
-                          try {
-                            setFoodReviewsLoading(true);
-                            const resp = await getFoodReviews(menuId);
-                            const list = resp?.data ?? resp ?? [];
-                            setFoodReviewsList(list);
-                            setFoodReviewsMenuId(menuId);
-                            setFoodReviewsOpen(true);
-                          } catch {
-                            showError(
-                              "Failed to load food reviews. Please try again.",
-                            );
-                          } finally {
-                            setFoodReviewsLoading(false);
-                          }
-                        }}
-                        className="text-xs font-semibold text-slate-600 underline underline-offset-2"
-                      >
-                        {foodReviewsLoading && foodReviewsMenuId === menuId
-                          ? "Loading..."
-                          : "View Reviews"}
-                      </button>
-                    </div>
-                  ) : null}
                 </div>
               );
             })}
@@ -601,23 +523,22 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
         title={
           reviewTarget?.type === "food"
             ? myFoodReviewsByMenuId[reviewTarget?.menuId]?.review
-              ? "Edit Food Review"
+              ? "Your Food Review"
               : "Rate Food"
             : myKitchenReview?.review
-              ? "Edit Kitchen Review"
+              ? "Your Kitchen Review"
               : "Rate Kitchen"
         }
         initialRating={reviewInitial.rating}
         initialReview={reviewInitial.review}
-        submitLabel={
-          reviewTarget?.reviewId ? "Update" : "Submit"
+        submitLabel="Submit"
+        readOnly={Boolean(reviewTarget?.readOnly)}
+        helperText={
+          reviewTarget?.readOnly
+            ? "Your review has already been submitted for this order."
+            : ""
         }
-        onDelete={
-          reviewTarget?.reviewId
-            ? handleReviewDelete
-            : undefined
-        }
-        deleteLabel="Delete Review"
+        errorText={reviewError}
       />
     </>
   );

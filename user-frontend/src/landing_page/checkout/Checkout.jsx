@@ -278,10 +278,10 @@ export default function Checkout() {
           </p>
           <button
             type="button"
-            onClick={() => navigate("/cart")}
+            onClick={() => navigate("/")}
             className="mt-6 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
           >
-            Back to cart
+            Back to Home
           </button>
         </div>
       </div>

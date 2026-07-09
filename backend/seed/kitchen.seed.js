@@ -22,6 +22,31 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendDataDir = path.resolve(__dirname, "../../user-frontend/src/data");
 
+const frontendSeedFiles = [
+  "categories.js",
+  "foods.js",
+  "popularFoods.js",
+  "kitchens.js",
+  "kitchenFoodCategories.js",
+  "menus.js",
+  "menuTags.js",
+  "menuTagMap.js",
+  "menuImages.js",
+];
+
+const hasFrontendSeedData = async () => {
+  try {
+    await Promise.all(
+      frontendSeedFiles.map((fileName) =>
+        fs.access(path.join(frontendDataDir, fileName))
+      )
+    );
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const loadFrontendData = async (fileName) => {
   const filePath = path.join(frontendDataDir, fileName);
   const source = await fs.readFile(filePath, "utf8");
@@ -41,6 +66,99 @@ const loadFrontendData = async (fileName) => {
 const createIdMap = (items) =>
   Object.fromEntries(items.map(({ id }) => [id, new mongoose.Types.ObjectId()]));
 
+const cloneKitchenCatalogData = ({
+  popularFoodsData,
+  kitchensData,
+  kitchenFoodCategoriesData,
+  menusData,
+  menuTagMapData,
+  menuImagesData,
+}) => {
+  const kitchenIdMap = Object.fromEntries(
+    kitchensData.map((kitchen, index) => [
+      kitchen.id,
+      `${kitchen.id}_clone_${index + 1}`,
+    ])
+  );
+  const categoryIdMap = Object.fromEntries(
+    kitchenFoodCategoriesData.map((category, index) => [
+      category.id,
+      `${category.id}_clone_${index + 1}`,
+    ])
+  );
+  const menuIdMap = Object.fromEntries(
+    menusData.map((menu, index) => [
+      menu.id,
+      `${menu.id}_clone_${index + 1}`,
+    ])
+  );
+
+  const clonedPopularFoods = popularFoodsData.map((item, index) => ({
+    ...item,
+    id: `${item.id}_clone_${index + 1}`,
+    order: Number(item.order ?? index + 1) + popularFoodsData.length,
+  }));
+
+  const clonedKitchens = kitchensData.map((kitchen, index) => ({
+    ...kitchen,
+    id: kitchenIdMap[kitchen.id],
+    owner_user_id: kitchen.owner_user_id
+      ? `${kitchen.owner_user_id}_clone`
+      : null,
+    name: `${kitchen.name} Express`,
+    rating: Math.max(3.8, Number(kitchen.rating ?? 4.2) - 0.1),
+    deliveryTime: `${Math.max(
+      15,
+      Number.parseInt(kitchen.deliveryTime, 10) + 5
+    )} min`,
+    address: `${kitchen.address}, Branch ${index + 2}`,
+    lastOrderTime: kitchen.lastOrderTime || "11:00 PM",
+  }));
+
+  const clonedKitchenFoodCategories = kitchenFoodCategoriesData.map(
+    (category, index) => ({
+      ...category,
+      id: categoryIdMap[category.id],
+      kitchenId: kitchenIdMap[category.kitchenId],
+      order: Number(category.order ?? index + 1),
+    })
+  );
+
+  const clonedMenus = menusData.map((menu, index) => ({
+    ...menu,
+    id: menuIdMap[menu.id],
+    kitchenId: kitchenIdMap[menu.kitchenId],
+    categoryId: categoryIdMap[menu.categoryId],
+    name: `${menu.name} Special`,
+    price: Number(menu.price) + 20,
+    rating: Math.max(3.9, Number(menu.rating ?? 4.3) - 0.1),
+  }));
+
+  const clonedMenuTagMaps = menuTagMapData.map((tagMap, index) => ({
+    ...tagMap,
+    id: `${tagMap.id}_clone_${index + 1}`,
+    menuId: menuIdMap[tagMap.menuId],
+  }));
+
+  const clonedMenuImages = menuImagesData.map((image, index) => ({
+    ...image,
+    id: `${image.id}_clone_${index + 1}`,
+    menuId: menuIdMap[image.menuId],
+  }));
+
+  return {
+    popularFoodsData: [...popularFoodsData, ...clonedPopularFoods],
+    kitchensData: [...kitchensData, ...clonedKitchens],
+    kitchenFoodCategoriesData: [
+      ...kitchenFoodCategoriesData,
+      ...clonedKitchenFoodCategories,
+    ],
+    menusData: [...menusData, ...clonedMenus],
+    menuTagMapData: [...menuTagMapData, ...clonedMenuTagMaps],
+    menuImagesData: [...menuImagesData, ...clonedMenuImages],
+  };
+};
+
 const clearKitchenCatalogData = async () => {
   // Delete child collections first to avoid dependency issues.
   await MenuTagMap.deleteMany({});
@@ -54,6 +172,98 @@ const clearKitchenCatalogData = async () => {
   await Food.deleteMany({});
   await FoodCategory.deleteMany({});
   await Kitchen.deleteMany({});
+};
+
+const sanitizeDocument = (document) => {
+  const { __v, ...rest } = document;
+  return rest;
+};
+
+const duplicateDatabaseSeedDocuments = ({
+  popularFoods,
+  kitchens,
+  kitchenFoodCategories,
+  menus,
+  menuTagMaps,
+  menuImages,
+}) => {
+  const kitchenIdMap = Object.fromEntries(
+    kitchens.map((kitchen) => [
+      String(kitchen._id),
+      new mongoose.Types.ObjectId(),
+    ])
+  );
+  const kitchenCategoryIdMap = Object.fromEntries(
+    kitchenFoodCategories.map((category) => [
+      String(category._id),
+      new mongoose.Types.ObjectId(),
+    ])
+  );
+  const menuIdMap = Object.fromEntries(
+    menus.map((menu) => [String(menu._id), new mongoose.Types.ObjectId()])
+  );
+
+  return {
+    popularFoods: [
+      ...popularFoods.map(sanitizeDocument),
+      ...popularFoods.map((item, index) => ({
+        ...sanitizeDocument(item),
+        _id: new mongoose.Types.ObjectId(),
+        order: Number(item.order ?? index + 1) + popularFoods.length,
+      })),
+    ],
+    kitchens: [
+      ...kitchens.map(sanitizeDocument),
+      ...kitchens.map((kitchen, index) => ({
+        ...sanitizeDocument(kitchen),
+        _id: kitchenIdMap[String(kitchen._id)],
+        name: `${kitchen.name} Express`,
+        rating: Math.max(3.8, Number(kitchen.rating ?? 4.2) - 0.1),
+        delivery_time: Math.max(
+          15,
+          Number.parseInt(kitchen.delivery_time ?? kitchen.deliveryTime, 10) + 5
+        ),
+        address: `${kitchen.address}, Branch ${index + 2}`,
+        last_order_time: kitchen.last_order_time || "11:00 PM",
+      })),
+    ],
+    kitchenFoodCategories: [
+      ...kitchenFoodCategories.map(sanitizeDocument),
+      ...kitchenFoodCategories.map((category) => ({
+        ...sanitizeDocument(category),
+        _id: kitchenCategoryIdMap[String(category._id)],
+        kitchen_id: kitchenIdMap[String(category.kitchen_id)],
+      })),
+    ],
+    menus: [
+      ...menus.map(sanitizeDocument),
+      ...menus.map((menu) => ({
+        ...sanitizeDocument(menu),
+        _id: menuIdMap[String(menu._id)],
+        kitchen_id: kitchenIdMap[String(menu.kitchen_id)],
+        category_id: kitchenCategoryIdMap[String(menu.category_id)],
+        name: `${menu.name} Special`,
+        price: Number(menu.price) + 20,
+        rating: Math.max(3.9, Number(menu.rating ?? 4.3) - 0.1),
+      })),
+    ],
+    menuTagMaps: [
+      ...menuTagMaps.map(sanitizeDocument),
+      ...menuTagMaps.map((tagMap) => ({
+        ...sanitizeDocument(tagMap),
+        _id: new mongoose.Types.ObjectId(),
+        menu_id: menuIdMap[String(tagMap.menu_id)],
+      })),
+    ],
+    menuImages: [
+      ...menuImages.map(sanitizeDocument),
+      ...menuImages.map((image) => ({
+        ...sanitizeDocument(image),
+        _id: new mongoose.Types.ObjectId(),
+        menu_id: menuIdMap[String(image.menu_id)],
+      })),
+    ],
+  };
 };
 
 const ensureSeedVendors = async (vendorIds) => {
@@ -88,16 +298,75 @@ const ensureSeedVendors = async (vendorIds) => {
 };
 
 const seedKitchenCatalog = async () => {
+  await connectDB();
+  const canLoadFrontendSeedData = await hasFrontendSeedData();
+
+  if (!canLoadFrontendSeedData) {
+    const [categories, foods, popularFoods, kitchens, kitchenFoodCategories, menus, menuTags, menuTagMaps, menuImages] =
+      await Promise.all([
+        FoodCategory.find().lean(),
+        Food.find().lean(),
+        PopularFood.find().lean(),
+        Kitchen.find().lean(),
+        KitchenFoodCategory.find().lean(),
+        Menu.find().lean(),
+        MenuTag.find().lean(),
+        MenuTagMap.find().lean(),
+        MenuImage.find().lean(),
+      ]);
+
+    const duplicated = duplicateDatabaseSeedDocuments({
+      popularFoods,
+      kitchens,
+      kitchenFoodCategories,
+      menus,
+      menuTagMaps,
+      menuImages,
+    });
+
+    await clearKitchenCatalogData();
+
+    await FoodCategory.insertMany(categories.map(sanitizeDocument));
+    await Food.insertMany(foods.map(sanitizeDocument));
+    await PopularFood.insertMany(duplicated.popularFoods);
+    await Kitchen.insertMany(duplicated.kitchens);
+    await KitchenFoodCategory.insertMany(duplicated.kitchenFoodCategories);
+    await Menu.insertMany(duplicated.menus);
+    await MenuTag.insertMany(menuTags.map(sanitizeDocument));
+    await MenuTagMap.insertMany(duplicated.menuTagMaps);
+    await MenuImage.insertMany(duplicated.menuImages);
+
+    console.log("Kitchen catalog seed completed from existing database data");
+    console.log(
+      JSON.stringify(
+        {
+          categories: categories.length,
+          foods: foods.length,
+          popularFoods: duplicated.popularFoods.length,
+          kitchens: duplicated.kitchens.length,
+          kitchenFoodCategories: duplicated.kitchenFoodCategories.length,
+          menus: duplicated.menus.length,
+          menuTags: menuTags.length,
+          menuTagMaps: duplicated.menuTagMaps.length,
+          menuImages: duplicated.menuImages.length,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
   const [
     categoriesData,
     foodsData,
-    popularFoodsData,
-    kitchensData,
-    kitchenFoodCategoriesData,
-    menusData,
+    rawPopularFoodsData,
+    rawKitchensData,
+    rawKitchenFoodCategoriesData,
+    rawMenusData,
     menuTagsData,
-    menuTagMapData,
-    menuImagesData,
+    rawMenuTagMapData,
+    rawMenuImagesData,
   ] = await Promise.all([
     loadFrontendData("categories.js"),
     loadFrontendData("foods.js"),
@@ -110,6 +379,22 @@ const seedKitchenCatalog = async () => {
     loadFrontendData("menuImages.js"),
   ]);
 
+  const {
+    popularFoodsData,
+    kitchensData,
+    kitchenFoodCategoriesData,
+    menusData,
+    menuTagMapData,
+    menuImagesData,
+  } = cloneKitchenCatalogData({
+    popularFoodsData: rawPopularFoodsData,
+    kitchensData: rawKitchensData,
+    kitchenFoodCategoriesData: rawKitchenFoodCategoriesData,
+    menusData: rawMenusData,
+    menuTagMapData: rawMenuTagMapData,
+    menuImagesData: rawMenuImagesData,
+  });
+
   const categoryIds = createIdMap(categoriesData);
   const foodIds = createIdMap(foodsData);
   const popularFoodIds = createIdMap(popularFoodsData);
@@ -120,7 +405,6 @@ const seedKitchenCatalog = async () => {
   const menuTagMapIds = createIdMap(menuTagMapData);
   const menuImageIds = createIdMap(menuImagesData);
 
-  await connectDB();
   const vendorIds = [
     ...new Set(
       kitchensData

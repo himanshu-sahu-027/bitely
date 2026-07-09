@@ -22,18 +22,18 @@ const paymentSchema = new mongoose.Schema(
 
     // Gateway metadata (razorpay for now)
     gateway: { type: String, default: "razorpay" },
-    gatewayOrderId: { type: String, required: true },
+    gatewayOrderId: { type: String, default: null },
     gatewaySignature: { type: String, default: null },
 
     // Existing fields (keep + extend)
     method: {
       type: String,
-      enum: ["UPI", "COD", "Card"],
+      enum: ["UPI", "COD", "Card", "ONLINE"],
       required: true,
     },
     status: {
       type: String,
-      enum: ["pending", "paid", "failed", "refunded"],
+      enum: ["pending", "paid", "failed", "refunded", "cancelled"],
       required: true,
     },
     transactionId: { type: String, trim: true, default: null },
@@ -48,7 +48,7 @@ const paymentSchema = new mongoose.Schema(
 
 paymentSchema.index({ orderId: 1 }, { unique: true });
 paymentSchema.index({ transactionId: 1 });
-paymentSchema.index({ gatewayOrderId: 1 });
+paymentSchema.index({ gatewayOrderId: 1 }, { sparse: true });
 
 const Payment = mongoose.models.Payment || mongoose.model("Payment", paymentSchema);
 

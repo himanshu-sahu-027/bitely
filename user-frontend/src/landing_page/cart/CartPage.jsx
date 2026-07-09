@@ -5,6 +5,7 @@ import CartBillSummary from "./cartComponents/CartBillSummary.jsx";
 import CartCheckoutBar from "./cartComponents/CartCheckoutBar.jsx";
 import CartCouponBox from "./cartComponents/CartCouponBox.jsx";
 import EmptyCart from "./cartComponents/EmptyCart.jsx";
+import dummyKitchenImg from "../../assets/images/dummy_kitchen_img.png";
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -43,9 +44,12 @@ const total = itemTotal + DELIVERY_FEE + gst - discount
               <div>
                 <div className="flex items-start gap-4">
                   <img
-                    src={cart.restaurant?.image}
+                    src={cart.restaurant?.image || dummyKitchenImg}
                     alt={cart.restaurant?.name || "Kitchen"}
                     className="h-20 w-20 rounded-xl object-cover"
+                    onError={(event) => {
+                      event.currentTarget.src = dummyKitchenImg;
+                    }}
                   />
 
                   <div className="min-w-0">
