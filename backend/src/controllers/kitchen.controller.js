@@ -24,7 +24,7 @@ const parseArrayFilter = (value) => {
       String(item)
         .split(",")
         .map((part) => part.trim())
-        .filter(Boolean)
+        .filter(Boolean),
     );
   }
 
@@ -57,8 +57,8 @@ const parseKitchenFilters = (query = {}) => {
       query.minRating !== undefined
         ? Number.parseFloat(query.minRating)
         : query.rating !== undefined
-        ? Number.parseFloat(query.rating)
-        : defaultKitchenFilters.rating,
+          ? Number.parseFloat(query.rating)
+          : defaultKitchenFilters.rating,
   };
 
   if (filters.rating && Number.isNaN(filters.rating)) {
@@ -97,7 +97,7 @@ export const getKitchensByFood = async (req, res, next) => {
     const paginated = await getFilteredKitchensByFoodPage(
       foodId,
       filters,
-      pagination
+      pagination,
     );
 
     sendResponse(res, {
@@ -272,52 +272,51 @@ export const searchFoodsAndKitchens = async (req, res, next) => {
       { $unwind: "$kitchen_id" },
       {
         $match: {
-          $or: [
-            { name: menuNameRegex },
-            { "food_id.name": foodNameRegex },
-          ],
+          $or: [{ name: menuNameRegex }, { "food_id.name": foodNameRegex }],
         },
       },
       {
         $project: {
-          _id: 1,
-          price: 1,
-          rating: 1,
-          imageUrl: 1,
-          kitchen_id: {
-            _id: "$kitchen_id._id",
-            name: "$kitchen_id.name",
-            rating: "$kitchen_id.rating",
-            delivery_time: "$kitchen_id.delivery_time",
-            imageUrl: "$kitchen_id.imageUrl",
-            address: "$kitchen_id.address",
-            last_order_time: "$kitchen_id.last_order_time",
+            _id: 1,
+            name: 1, // added to show the menu name in search results if needed
+            price: 1,
+            rating: 1,
+            imageUrl: 1,
+
+            kitchen_id: {
+              _id: "$kitchen_id._id",
+              name: "$kitchen_id.name",
+              rating: "$kitchen_id.rating",
+              delivery_time: "$kitchen_id.delivery_time",
+              imageUrl: "$kitchen_id.imageUrl",
+              address: "$kitchen_id.address",
+              last_order_time: "$kitchen_id.last_order_time",
+            },
+
+            food_id: {
+              _id: "$food_id._id",
+              name: "$food_id.name",
+              slug: "$food_id.slug",
+            },
           },
-          food_id: {
-            _id: "$food_id._id",
-            name: "$food_id.name",
-            slug: "$food_id.slug",
-          },
-        },
       },
-      // Deduplicate by menu._id (in case of unexpected join duplication)
-      {
-        $group: {
-          _id: "$_id",
-          doc: { $first: "$$ROOT" },
-        },
-      },
-      { $replaceRoot: { newRoot: "$doc" } },
+      
       { $limit: 10 },
     ]);
 
     const foodsPayload = menuItems.map((m) => ({
-      id: String(m.food_id._id),
-      name: m.food_id.name,
+      id: String(m._id), // Menu ID
+
+      name: m.name, // Menu Name
+
       slug: m.food_id.slug,
+
       image: m.imageUrl || "",
+
       price: m.price ?? 0,
+
       rating: m.rating ?? 0,
+
       kitchen: {
         id: String(m.kitchen_id._id),
         name: m.kitchen_id.name,
@@ -326,10 +325,16 @@ export const searchFoodsAndKitchens = async (req, res, next) => {
       },
     }));
 
+    const uniqueFoods = Array.from(
+      new Map(
+        foodsPayload.map((food) => [food.name.trim().toLowerCase(), food]),
+      ).values(),
+    );
+
     sendResponse(res, {
       message: "Search results fetched successfully",
       data: {
-        foods: foodsPayload,
+        foods: uniqueFoods,
         kitchens: kitchensPayload,
       },
     });

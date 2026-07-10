@@ -15,6 +15,8 @@ function SearchResultDropdown({
 
   if (!query) return null;
 
+  console.log("results.foods", results.foods);
+
   return (
     <div className="absolute top-full left-0 mt-2 w-full bg-gray-100 rounded-xl shadow-xl border z-50 max-h-[400px] overflow-y-auto">
       {loading && (

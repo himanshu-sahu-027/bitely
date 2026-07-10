@@ -73,16 +73,21 @@ function SearchBar() {
     }
   }, [location.search]);
 
+  console.log("inside search bar.jsx results foods food.id",results.foods.map((food) => food.id));
+  
+
   const handleFoodClick = (food) => {
     setShowDropdown(false);
     setQuery("");
-    navigate(`/food/${food.slug || food.id || food._id}`);
+    navigate(`/food/${food.id}`);
   };
 
+  console.log("inside search bar.jsx results kitchens kitchen.id",results.kitchens.map((kitchen) => kitchen.id));
+  
   const handleKitchenClick = (kitchen) => {
     setShowDropdown(false);
     setQuery("");
-    navigate(`/kitchen/${kitchen.id || kitchen._id}`);
+    navigate(`/kitchen/${kitchen.id }`);
   };
 
   const handleEnter = (e) => {
