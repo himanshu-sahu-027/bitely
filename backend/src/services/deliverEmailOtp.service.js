@@ -1,8 +1,8 @@
 import nodemailer from "nodemailer";
 import { config } from "../config/env.js";
 
-const buildOtpMessage = (otp) =>
-  `Your Bitely OTP is ${otp}. It expires in 5 minutes.`;
+
+const buildOtpMessage = (otp) => `<p>Hello <b>Badal Pujhari</b>,</p><p>Your Bitely Verification Code <h1>   ${otp}</h1></p><p>This verification code is valid for 5 minutes. For your security, never share this OTP with anyone.</p>`;
 
 const getEmailTransporter = () => {
   if (
@@ -33,7 +33,7 @@ export const deliverEmailOtp = async ({ identifier, otp }) => {
   await transporter.sendMail({
     from: config.SMTP_FROM,
     to: identifier,
-    subject: "Your Bitely OTP",
-    text: message,
+    subject: "Verify your Bitely account",
+    html: message,
   });
 };

@@ -432,7 +432,10 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
             >
               Cancel Order
             </button>
-          ) : !isActive ? (
+          ) : /*!isActive ? (
+
+          // Reorder button is disabled for now, as it may require more logic to handle stock availability, menu changes, etc. and also need to handle the case where the kitchen is no longer available and have to add those items to cart For now , we can just show a placeholder for future functionality.
+          
             <button
               type="button"
               onClick={() => onReorder?.(order)}
@@ -440,7 +443,8 @@ function OrderCard({ order, onReorder, onCancel, onPay }) {
             >
               Reorder
             </button>
-          ) : null}
+          ) :*/ null}
+
         </div>
       </article>
 

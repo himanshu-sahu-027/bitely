@@ -44,7 +44,7 @@ function Footer() {
               <div>
                 <p className="text-gray-400 text-xs">Email</p>
                 <p className="group-hover:text-blue-400 transition">
-                  info@bitely.food
+                  bitely2026@gmail.com
                 </p>
               </div>
             </a>

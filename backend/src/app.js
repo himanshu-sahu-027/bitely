@@ -25,6 +25,8 @@ app.use("/api/auth", authLimiter);
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import kitchenRoutes from "./routes/kitchen.routes.js";
+import searchRoutes from "./routes/search.routes.js";
+
 import orderRoutes from "./routes/order.routes.js";
 import cartRoutes from "./routes/cart.routes.js";
 import paymentRoutes from "./routes/payment.routes.js";
@@ -35,6 +37,8 @@ import reviewRoutes from "./routes/review.routes.js";
 app.use("/api/user", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/kitchen", kitchenRoutes);
+app.use("/api/search", searchRoutes);
+
 app.use("/api/orders", orderRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/payment", paymentRoutes);

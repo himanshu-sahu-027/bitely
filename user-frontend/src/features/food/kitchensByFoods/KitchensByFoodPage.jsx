@@ -5,8 +5,8 @@ import CategoryFilter from "../../../components/filters/CategoryFilter";
 import EmptyState from "../../../components/layout/EmptyState";
 import {
   fetchFoodCategories,
-  fetchFoods,
   fetchRestaurantsByFood,
+  fetchRestaurantsByMenu,
 } from "../../../services/restaurantService";
 
 const defaultFilters = {
@@ -22,7 +22,7 @@ export default function KitchensByFoodPage() {
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [food, setFood] = useState(null);
+  const [itemName, setItemName] = useState(null);
   const { slug } = useParams();
 
   useEffect(() => {
@@ -33,27 +33,24 @@ export default function KitchensByFoodPage() {
       setError("");
 
       try {
-        const [categoriesResponse, foodsResponse] = await Promise.all([
-          fetchFoodCategories(),
-          fetchFoods({ slug }),
-        ]);
-        const matchedFood = foodsResponse.data?.[0] ?? null;
+        const [categoriesResponse] = await Promise.all([fetchFoodCategories()]);
 
-        if (!matchedFood) {
-          throw new Error("Food not found");
-        }
-
-        const kitchensResponse = await fetchRestaurantsByFood(matchedFood.id, {
+        const kitchensResponse = await fetchRestaurantsByMenu(slug, {
           sort: filters.sort,
           minRating: filters.rating || undefined,
-          categories: filters.categories.length > 0 ? filters.categories.join(",") : undefined,
+          categories:
+            filters.categories.length > 0
+              ? filters.categories.join(",")
+              : undefined,
           tags: filters.tags.length > 0 ? filters.tags.join(",") : undefined,
         });
 
         if (!ignore) {
           setCategories(categoriesResponse.data ?? []);
-          setFood(matchedFood);
-          setKitchens(kitchensResponse.data ?? []);
+          
+          setItemName(kitchensResponse.menu?.name ?? "Selected menu");
+
+          setKitchens(kitchensResponse.kitchens ?? []);
         }
       } catch (loadError) {
         if (!ignore) {
@@ -73,7 +70,7 @@ export default function KitchensByFoodPage() {
     };
   }, [filters, slug]);
 
-  if (!food) {
+  if (!kitchens || (kitchens.length === 0 && isLoading === false)) {
     return (
       <div
         style={{
@@ -82,7 +79,7 @@ export default function KitchensByFoodPage() {
           background: "linear-gradient(180deg, #eaecf5, #e4e9ef)",
         }}
       >
-        <h1>Food not found</h1>
+        <h1>Item not found</h1>
       </div>
     );
   }
@@ -90,16 +87,17 @@ export default function KitchensByFoodPage() {
   return (
     <div
       style={{
-        
         minHeight: "100vh",
         background: "linear-gradient(180deg, #eaecf5, #e4e9ef)",
       }}
     >
-        <CategoryFilter categories={categories} onFilterChange={setFilters} />
+      <CategoryFilter categories={categories} onFilterChange={setFilters} />
       <p className="ml-5 text-3xl font-semibold tracking-[0.04em] text-black py-3 ">
-        Kitchens serving {food.name}
+        Kitchens serving {itemName ?? "Selected menu"}
       </p>
-      {isLoading ? <p className="px-5 text-sm text-slate-600">Loading kitchens...</p> : null}
+      {isLoading ? (
+        <p className="px-5 text-sm text-slate-600">Loading kitchens...</p>
+      ) : null}
       {error ? <p className="px-5 text-sm text-red-600">{error}</p> : null}
       {!isLoading && !error ? (
         kitchens.length > 0 ? (

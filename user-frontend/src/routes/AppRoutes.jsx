@@ -84,6 +84,7 @@ function AppContent() {
         <Route path="/search" element={<SearchResultsPage />} />
         <Route path="/about" element={<About />} />
         <Route path="/food/:slug" element={<KitchensByFoodPage />} />
+        <Route path="/menu/:slug" element={<KitchensByFoodPage />} />
         <Route
           path="/cart"
           element={
@@ -124,8 +125,6 @@ function AppContent() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
         <Route path="/reset-password" element={<ResetPassword />} />
-
-        
 
         <Route path="*" element={<NotFound />} />
       </Routes>

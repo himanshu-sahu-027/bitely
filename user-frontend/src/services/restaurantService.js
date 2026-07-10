@@ -29,3 +29,8 @@ export async function fetchRestaurantsByFood(foodId, params = {}) {
   const response = await api.get(`/api/kitchen/food/${foodId}`, { params });
   return response.data;
 }
+
+export async function fetchRestaurantsByMenu(menuSlug, params = {}) {
+  const response = await api.get(`/api/search/menu/${menuSlug}`, { params });
+  return response.data.data;
+}

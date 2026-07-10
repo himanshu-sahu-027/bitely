@@ -66,6 +66,13 @@ const loadFrontendData = async (fileName) => {
 const createIdMap = (items) =>
   Object.fromEntries(items.map(({ id }) => [id, new mongoose.Types.ObjectId()]));
 
+const slugify = (value = "") =>
+  String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 const cloneKitchenCatalogData = ({
   popularFoodsData,
   kitchensData,
@@ -124,15 +131,19 @@ const cloneKitchenCatalogData = ({
     })
   );
 
-  const clonedMenus = menusData.map((menu, index) => ({
-    ...menu,
-    id: menuIdMap[menu.id],
-    kitchenId: kitchenIdMap[menu.kitchenId],
-    categoryId: categoryIdMap[menu.categoryId],
-    name: `${menu.name} Special`,
-    price: Number(menu.price) + 20,
-    rating: Math.max(3.9, Number(menu.rating ?? 4.3) - 0.1),
-  }));
+  const clonedMenus = menusData.map((menu, index) => {
+    const menuName = `${menu.name} Special`;
+    return {
+      ...menu,
+      id: menuIdMap[menu.id],
+      kitchenId: kitchenIdMap[menu.kitchenId],
+      categoryId: categoryIdMap[menu.categoryId],
+      name: menuName,
+      slug: slugify(menuName),
+      price: Number(menu.price) + 20,
+      rating: Math.max(3.9, Number(menu.rating ?? 4.3) - 0.1),
+    };
+  });
 
   const clonedMenuTagMaps = menuTagMapData.map((tagMap, index) => ({
     ...tagMap,
@@ -237,15 +248,19 @@ const duplicateDatabaseSeedDocuments = ({
     ],
     menus: [
       ...menus.map(sanitizeDocument),
-      ...menus.map((menu) => ({
-        ...sanitizeDocument(menu),
-        _id: menuIdMap[String(menu._id)],
-        kitchen_id: kitchenIdMap[String(menu.kitchen_id)],
-        category_id: kitchenCategoryIdMap[String(menu.category_id)],
-        name: `${menu.name} Special`,
-        price: Number(menu.price) + 20,
-        rating: Math.max(3.9, Number(menu.rating ?? 4.3) - 0.1),
-      })),
+      ...menus.map((menu) => {
+        const menuName = `${menu.name} Special`;
+        return {
+          ...sanitizeDocument(menu),
+          _id: menuIdMap[String(menu._id)],
+          kitchen_id: kitchenIdMap[String(menu.kitchen_id)],
+          category_id: kitchenCategoryIdMap[String(menu.category_id)],
+          name: menuName,
+          slug: slugify(menuName),
+          price: Number(menu.price) + 20,
+          rating: Math.max(3.9, Number(menu.rating ?? 4.3) - 0.1),
+        };
+      }),
     ],
     menuTagMaps: [
       ...menuTagMaps.map(sanitizeDocument),
@@ -300,6 +315,8 @@ const ensureSeedVendors = async (vendorIds) => {
 const seedKitchenCatalog = async () => {
   await connectDB();
   const canLoadFrontendSeedData = await hasFrontendSeedData();
+  console.log("canLoadFrontendSeedData =", canLoadFrontendSeedData);
+
 
   if (!canLoadFrontendSeedData) {
     const [categories, foods, popularFoods, kitchens, kitchenFoodCategories, menus, menuTags, menuTagMaps, menuImages] =
@@ -467,16 +484,20 @@ const seedKitchenCatalog = async () => {
   );
 
   const menus = menusData.map(
-    ({ id, kitchenId, foodId, categoryId, name, price, rating, image }) => ({
-      _id: menuIds[id],
-      kitchen_id: kitchenIds[kitchenId],
-      food_id: foodIds[foodId],
-      category_id: kitchenFoodCategoryIds[categoryId],
-      name,
-      price,
-      rating,
-      imageUrl: image,
-    })
+    ({ id, kitchenId, foodId, categoryId, name, price, rating, image }) => {
+      const menuName = name;
+      return {
+        _id: menuIds[id],
+        kitchen_id: kitchenIds[kitchenId],
+        food_id: foodIds[foodId],
+        category_id: kitchenFoodCategoryIds[categoryId],
+        name: menuName,
+        slug: slugify(menuName),
+        price,
+        rating,
+        imageUrl: image,
+      };
+    }
   );
 
   const menuTags = menuTagsData.map(({ id, name }) => ({

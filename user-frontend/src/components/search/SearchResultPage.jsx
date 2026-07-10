@@ -5,7 +5,7 @@ import { Search, Store } from "lucide-react";
 import FoodCard from "../food/FoodCard";
 import KitchenCard from "../kitchen/KitchenCard";
 
-import { searchFoodsAndKitchens } from "../../services/searchService";
+import { searchMenusAndKitchens } from "../../services/searchService";
 
 function SearchResultsPage() {
   const [searchParams] = useSearchParams();
@@ -17,7 +17,7 @@ function SearchResultsPage() {
   const [activeTab, setActiveTab] = useState("all");
 
   const [results, setResults] = useState({
-    foods: [],
+    menus: [],
     kitchens: [],
   });
 
@@ -25,7 +25,7 @@ function SearchResultsPage() {
     const fetchResults = async () => {
       if (!query.trim()) {
         setResults({
-          foods: [],
+          menus: [],
           kitchens: [],
         });
         setLoading(false);
@@ -35,7 +35,7 @@ function SearchResultsPage() {
       try {
         setLoading(true);
 
-        const data = await searchFoodsAndKitchens(query);
+        const data = await searchMenusAndKitchens(query);
 
         setResults(data);
       } catch (error) {
@@ -57,22 +57,22 @@ function SearchResultsPage() {
   }
 
   const totalResults =
-    results.foods.length + results.kitchens.length;
+    results.menus.length + results.kitchens.length;
 
   const displayedResults =
-    activeTab === "foods"
-      ? results.foods.length
+    activeTab === "menus"
+      ? results.menus.length
       : activeTab === "kitchens"
         ? results.kitchens.length
         : totalResults;
 
   const noResults =
-    results.foods.length === 0 &&
+    results.menus.length === 0 &&
     results.kitchens.length === 0;
 
-  const showFoodSection =
-    (activeTab === "all" || activeTab === "foods") &&
-    results.foods.length > 0;
+  const showMenuSection =
+    (activeTab === "all" || activeTab === "menus") &&
+    results.menus.length > 0;
 
   const showKitchenSection =
     (activeTab === "all" || activeTab === "kitchens") &&
@@ -97,7 +97,7 @@ function SearchResultsPage() {
         )}
 
         <div className="flex gap-3 mt-6">
-          {["all", "foods", "kitchens"].map((tab) => (
+          {["all", "menus", "kitchens"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -129,26 +129,26 @@ function SearchResultsPage() {
       )}
 
 
-      {showFoodSection && (
+      {showMenuSection && (
         <section className="mb-10">
           <div className="flex items-center gap-2 mb-5">
             <h2 className="text-2xl font-semibold">Foods</h2>
 
             <span className="text-gray-500">
-              ({results.foods.length})
+              ({results.menus.length})
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {results.foods.map((food) => (
+            {results.menus.map((menu) => (
               <FoodCard
-                key={food.id}
-                id={food.id}
-                name={food.name}
-                image={food.image}
-                price={food.price}
-                rating={food.rating}
-                kitchen={food.kitchen}
+                key={menu.id}
+                id={menu.id}
+                name={menu.name}
+                image={menu.image}
+                price={menu.price}
+                rating={menu.rating}
+                kitchen={menu.kitchen}
               />
             ))}
           </div>

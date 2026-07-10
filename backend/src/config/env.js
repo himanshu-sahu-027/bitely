@@ -3,7 +3,7 @@ import "dotenv/config";
 export const config = {
   PORT: Number(process.env.PORT || 5000),
   DEV_MODE: String(process.env.DEV_MODE || "false").toLowerCase() === "true",
-  MONGO_URI: process.env.MONGODB_URI || process.env.MONGO_URI,
+  MONGO_URI: process.env.MONGO_URI  ,
   MONGO_DB_NAME: process.env.MONGO_DB_NAME || "bitely",
   JWT_SECRET: process.env.JWT_SECRET,
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:5173",

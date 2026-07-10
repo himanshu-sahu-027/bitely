@@ -4,18 +4,18 @@ function SearchResultDropdown({
   loading,
   query,
   results,
-  onFoodClick,
+  onMenuClick,
   onKitchenClick,
 }) {
   const noResults =
     !loading &&
     query &&
-    results.foods.length === 0 &&
+    results.menus.length === 0 &&
     results.kitchens.length === 0;
 
   if (!query) return null;
 
-  console.log("results.foods", results.foods);
+  console.log("results.menus", results.menus);
 
   return (
     <div className="absolute top-full left-0 mt-2 w-full bg-gray-100 rounded-xl shadow-xl border z-50 max-h-[400px] overflow-y-auto">
@@ -25,20 +25,20 @@ function SearchResultDropdown({
       
       {!loading && (
         <>
-          {results.foods.length > 0 && (
+          {results.menus.length > 0 && (
             <div>
               <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase border-b">
-                Foods
+                Menus
               </div>
 
-              {results.foods.map((food) => (
+              {results.menus.map((menu) => (
                 <button
-                  key={food.id ?? food._id}
-                  onClick={() => onFoodClick(food)}
+                  key={menu.id ?? menu._id}
+                  onClick={() => onMenuClick(menu)}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
                 >
                   <UtensilsCrossed size={18} />
-                  <span>{food.name}</span>
+                  <span>{menu.name}</span>
                 </button>
               ))}
             </div>

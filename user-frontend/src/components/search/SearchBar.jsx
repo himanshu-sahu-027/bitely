@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import SearchResultDropdown from "./SearchResultDropdown";
-import { searchFoodsAndKitchens } from "../../services/searchService";
+import { searchMenusAndKitchens } from "../../services/searchService";
 import "./SearchBar.css";
 
 function SearchBar() {
@@ -14,7 +14,7 @@ function SearchBar() {
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [results, setResults] = useState({
-    foods: [],
+    menus: [],
     kitchens: [],
   });
 
@@ -27,7 +27,7 @@ function SearchBar() {
 
       if (!trimmed) {
         setResults({
-          foods: [],
+          menus: [],
           kitchens: [],
         });
         return;
@@ -36,7 +36,7 @@ function SearchBar() {
       try {
         setLoading(true);
 
-        const data = await searchFoodsAndKitchens(trimmed);
+        const data = await searchMenusAndKitchens(trimmed);
 
         setResults(data);
       } catch (error) {
@@ -73,21 +73,17 @@ function SearchBar() {
     }
   }, [location.search]);
 
-  console.log("inside search bar.jsx results foods food.id",results.foods.map((food) => food.id));
-  
+  const handleMenuClick = (menu) => {
+  setShowDropdown(false);
+  setQuery("");
 
-  const handleFoodClick = (food) => {
-    setShowDropdown(false);
-    setQuery("");
-    navigate(`/food/${food.id}`);
-  };
+  navigate(`/menu/${menu.slug}`);
+};
 
-  console.log("inside search bar.jsx results kitchens kitchen.id",results.kitchens.map((kitchen) => kitchen.id));
-  
   const handleKitchenClick = (kitchen) => {
     setShowDropdown(false);
     setQuery("");
-    navigate(`/kitchen/${kitchen.id }`);
+    navigate(`/kitchen/${kitchen.id}`);
   };
 
   const handleEnter = (e) => {
@@ -97,26 +93,19 @@ function SearchBar() {
     if (!trimmed) return;
 
     const recentSearches =
-      JSON.parse(
-        localStorage.getItem("recentSearches")
-      ) || [];
+      JSON.parse(localStorage.getItem("recentSearches")) || [];
 
     const updated = [
       trimmed,
       ...recentSearches.filter((item) => item !== trimmed),
     ].slice(0, 5);
 
-    localStorage.setItem(
-      "recentSearches",
-      JSON.stringify(updated)
-    );
+    localStorage.setItem("recentSearches", JSON.stringify(updated));
 
     setShowDropdown(false);
     inputRef.current?.blur();
 
-    navigate(
-      `/search?q=${encodeURIComponent(trimmed)}`
-    );
+    navigate(`/search?q=${encodeURIComponent(trimmed)}`);
   };
 
   return (
@@ -139,7 +128,7 @@ function SearchBar() {
           loading={loading}
           query={query}
           results={results}
-          onFoodClick={handleFoodClick}
+          onMenuClick={handleMenuClick}
           onKitchenClick={handleKitchenClick}
         />
       )}

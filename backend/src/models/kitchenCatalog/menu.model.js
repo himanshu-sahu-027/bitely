@@ -18,6 +18,10 @@ const menuSchema = new mongoose.Schema(
       required: true,
     },
     name: { type: String, required: true, trim: true },
+
+    // Menu slug (menu-centric routing/lookup)
+    slug: { type: String, required: true, trim: true,lowercase: true, index: true },
+
     price: { type: Number, required: true, min: 0 },
     rating: { type: Number, min: 0, max: 5, default: 0 },
     totalRatings: { type: Number, default: 0 },
