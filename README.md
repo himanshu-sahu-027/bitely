@@ -1,17 +1,15 @@
 # Bitely
 
-Bitely is a food ordering platform organized as a monorepo. It includes a Node.js/Express backend, a customer-facing frontend, a vendor frontend, and an admin panel.
+Bitely is a food ordering platform organized as a monorepo.For now, it includes a Node.js/Express backend and a customer-facing frontend. The backend is designed with modularity and scalability in mind, so that in the future it can be extended to support a vendor-facing frontend and an admin panel.
 
 ## Project Structure
 
 - `backend` - Express API with MongoDB, Redis, JWT auth, OTP delivery, cart, kitchen, order, and user routes
 - `user-frontend` - Customer-facing React + Vite application
-- `vendor-frontend` - Vendor-facing React + Vite application
-- `admin-panel` - Admin React + Vite application
 
 ## Tech Stack
 
-- Backend: Node.js, Express, MongoDB, Redis, JWT, Nodemailer, Twilio
+- Backend: Node.js, Express, MongoDB, Redis, JWT, Nodemailer, Google OAuth, Razorpay
 - Frontend: React 19, Vite, ESLint
 
 ## Prerequisites
@@ -41,8 +39,6 @@ Install dependencies inside each app:
 ```bash
 cd backend && npm install
 cd ../user-frontend && npm install
-cd ../vendor-frontend && npm install
-cd ../admin-panel && npm install
 ```
 
 ## Running the Apps
@@ -52,8 +48,6 @@ Start each service in its own terminal:
 ```bash
 cd backend && npm run dev
 cd user-frontend && npm run dev
-cd vendor-frontend && npm run dev
-cd admin-panel && npm run dev
 ```
 
 ## Available Scripts
@@ -76,22 +70,22 @@ Required:
 
 - `MONGO_URI`
 - `JWT_SECRET`
-
-Optional:
-
-- `PORT`
-- `REDIS_HOST`
-- `REDIS_PORT`
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_SECURE`
 - `SMTP_USER`
 - `SMTP_PASS`
 - `SMTP_FROM`
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- `TWILIO_PHONE_NUMBER`
-- `SMS_DEFAULT_COUNTRY_CODE`
+- `GOOGLE_CLIENT_ID`
+- `RAZORPAY_KEY_ID`
+- `RAZORPAY_SECRET`
+
+Optional:
+
+- `PORT`
+- `REDIS_HOST`
+- `REDIS_PORT`
+- `RAZORPAY_WEBHOOK_SECRET`
 
 ## API Base
 
